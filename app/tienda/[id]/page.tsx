@@ -1,24 +1,17 @@
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, ShoppingCart, Truck, ShieldCheck, RotateCcw, Minus, Plus } from "lucide-react"
+import { Truck, ShieldCheck, RotateCcw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { products, getProductById, getRelatedProducts, categoryLabels, type Category } from "@/lib/products"
+import { getProductById, getRelatedProducts } from "@/lib/queries"
 import { ProductCard } from "@/components/product-card"
 import { StoreFooter } from "@/components/store-footer"
 import { ProductDetailNavbar } from "@/components/product-detail-navbar"
-import { QuantitySelector } from "@/components/quantity-selector"
-
-export function generateStaticParams() {
-  return products.map((product) => ({
-    id: product.id,
-  }))
-}
+import { ProductActions } from "@/components/product-actions"
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const product = getProductById(id)
+  const product = await getProductById(id)
   if (!product) return { title: "Producto no encontrado" }
   return {
     title: `${product.name} - La Casa del Minero Tienda`,
@@ -28,14 +21,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const product = getProductById(id)
+  const product = await getProductById(id)
 
   if (!product) {
     notFound()
   }
 
-  const related = getRelatedProducts(id, 4)
-  const catLabel = categoryLabels[product.category as Category] ?? product.category
+  const related = await getRelatedProducts(id, 4)
+  const catLabel = product.category
 
   return (
     <div className="min-h-screen bg-background">
@@ -136,17 +129,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Quantity + Add to cart */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <QuantitySelector disabled={!product.inStock} />
-              <Button
-                size="lg"
-                className="flex-1 gap-2 text-sm uppercase tracking-wide"
-                disabled={!product.inStock}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Agregar al carrito
-              </Button>
-            </div>
+            <ProductActions product={product} />
 
             {/* Benefits */}
             <div className="mt-2 grid grid-cols-3 gap-3">

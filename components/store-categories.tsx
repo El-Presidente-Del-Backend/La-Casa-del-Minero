@@ -1,14 +1,21 @@
 "use client"
 
 import Image from "next/image"
-import { categoryImages, categoryLabels, type Category } from "@/lib/products"
-
-const displayCategories: Category[] = ["Seguridad", "Herramientas", "Iluminacion", "Deteccion"]
+import type { CategoryRecord } from "@/lib/products"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
 
 export function StoreCategories({
+  categories,
   onCategoryChange,
 }: {
-  onCategoryChange?: (cat: Category) => void
+  categories: CategoryRecord[]
+  onCategoryChange?: (cat: string) => void
 }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
@@ -18,32 +25,42 @@ export function StoreCategories({
           Categorías Destacadas
         </h2>
       </div>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {displayCategories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => onCategoryChange?.(cat)}
-            className="group relative overflow-hidden rounded-lg border border-border"
-          >
-            <div className="relative aspect-[4/3]">
-              <Image
-                src={categoryImages[cat]}
-                alt={categoryLabels[cat]}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
-                sizes="(max-width: 640px) 50vw, 25vw"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/30 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-4">
-                <p className="text-sm font-bold uppercase tracking-wide text-foreground">
-                  {categoryLabels[cat]}
-                </p>
-                <p className="mt-0.5 text-xs text-primary">Ver productos</p>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+
+      <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
+        <CarouselContent className="-ml-4">
+          {categories.map((cat) => (
+            <CarouselItem key={cat.id} className="basis-1/2 pl-4 sm:basis-1/3 md:basis-1/4">
+              <button
+                onClick={() => onCategoryChange?.(cat.name)}
+                className="group relative w-full overflow-hidden rounded-lg border border-border"
+              >
+                <div className="relative aspect-[4/3]">
+                  {cat.image_url ? (
+                    <Image
+                      src={cat.image_url}
+                      alt={cat.label}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-muted" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/30 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-4">
+                    <p className="text-sm font-bold uppercase tracking-wide text-foreground">
+                      {cat.label}
+                    </p>
+                    <p className="mt-0.5 text-xs text-primary">Ver productos</p>
+                  </div>
+                </div>
+              </button>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious className="-left-3 hidden md:flex" />
+        <CarouselNext className="-right-3 hidden md:flex" />
+      </Carousel>
     </section>
   )
 }

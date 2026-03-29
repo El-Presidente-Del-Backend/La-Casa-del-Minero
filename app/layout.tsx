@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Oswald } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
+import { CartProvider } from '@/lib/cart/cart-context'
+import { CartDrawer } from '@/components/cart-drawer'
 import './globals.css'
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -42,7 +45,11 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${_inter.variable} ${_oswald.variable} font-sans antialiased`}>
-        {children}
+        <CartProvider>
+          {children}
+          <CartDrawer />
+          <Toaster position="bottom-right" richColors />
+        </CartProvider>
         <Analytics />
       </body>
     </html>

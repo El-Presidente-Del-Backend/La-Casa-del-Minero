@@ -1,9 +1,22 @@
 "use client"
 
 import Link from "next/link"
-import { Pickaxe, ArrowLeft, ShoppingCart, User } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Pickaxe, ArrowLeft, ShoppingCart, User, LogOut } from "lucide-react"
+import { useUser } from "@/hooks/use-user"
+import { useCart } from "@/lib/cart/cart-context"
+import { createClient } from "@/lib/supabase/client"
 
 export function ProductDetailNavbar() {
+  const router = useRouter()
+  const { user, loading } = useUser()
+  const { totalItems, setIsOpen: setCartOpen } = useCart()
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.refresh()
+  }
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card">
       {/* Top bar */}
@@ -17,13 +30,30 @@ export function ProductDetailNavbar() {
             Volver a la tienda
           </Link>
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
-              <User className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Mi Cuenta</span>
-            </button>
-            <button className="relative flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+            {loading ? (
+              <span className="h-4 w-16 animate-pulse rounded bg-muted" />
+            ) : user ? (
+              <div className="flex items-center gap-3">
+                <span className="hidden text-xs text-muted-foreground sm:inline">{user.email}</span>
+                <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Salir</span>
+                </button>
+              </div>
+            ) : (
+              <Link href="/auth/login" className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                <User className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Iniciar Sesión</span>
+              </Link>
+            )}
+            <button onClick={() => setCartOpen(true)} className="relative flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
               <ShoppingCart className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Carrito</span>
+              {totalItems > 0 && (
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {totalItems}
+                </span>
+              )}
             </button>
           </div>
         </div>

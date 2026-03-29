@@ -3,12 +3,11 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ShoppingCart } from "lucide-react"
-import { categoryLabels, type Product, type Category } from "@/lib/products"
+import { AddToCartButton } from "@/components/add-to-cart-button"
+import type { Product } from "@/lib/products"
 
 export function ProductCard({ product }: { product: Product }) {
-  const catLabel = categoryLabels[product.category as Category] ?? product.category
+  const catLabel = product.category
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
@@ -64,15 +63,7 @@ export function ProductCard({ product }: { product: Product }) {
               </span>
             )}
           </div>
-          <Button
-            size="sm"
-            className="gap-1.5 text-xs"
-            disabled={!product.inStock}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ShoppingCart className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Agregar</span>
-          </Button>
+          <AddToCartButton product={product} size="sm" className="gap-1.5 text-xs" />
         </div>
       </div>
     </article>

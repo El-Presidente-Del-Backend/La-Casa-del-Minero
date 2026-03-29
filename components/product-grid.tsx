@@ -2,15 +2,17 @@
 
 import { useMemo } from "react"
 import { ProductCard } from "@/components/product-card"
-import { products, type Category } from "@/lib/products"
+import type { Product } from "@/lib/products"
 import { PackageX } from "lucide-react"
 
 export function ProductGrid({
   search,
   activeCategory,
+  products,
 }: {
   search: string
-  activeCategory: Category
+  activeCategory: string
+  products: Product[]
 }) {
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -21,7 +23,7 @@ export function ProductGrid({
         activeCategory === "Todos" || p.category === activeCategory
       return matchesSearch && matchesCategory
     })
-  }, [search, activeCategory])
+  }, [search, activeCategory, products])
 
   return (
     <div className="flex flex-col gap-6">
