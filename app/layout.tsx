@@ -14,8 +14,8 @@ export const metadata: Metadata = {
   description: 'Tu proveedor de confianza en equipos, herramientas y suministros para la industria minera. Calidad, seguridad y experiencia al servicio de tu operación.',
   generator: 'v0.app',
   icons: {
-    icon: '/Logo.png',
-    apple: '/Logo.png',
+    icon: '/Logo2.png',
+    apple: '/Logo2.png',
   },
 }
 
