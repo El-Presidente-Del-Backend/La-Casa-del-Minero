@@ -1,0 +1,21 @@
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+
+env:
+  # Supabase (públicas — se exponen al cliente)
+  - variable: NEXT_PUBLIC_SUPABASE_URL
+    value: https://pybxheleybnzxwbgregh.supabase.co
+
+  - variable: NEXT_PUBLIC_SUPABASE_ANON_KEY
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5YnhoZWxleWJuenh3YmdyZWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDI5MDAsImV4cCI6MjA5MDAxODkwMH0.ZR1xCJMMZaCimVnx-NU983yW7JLQY9ACLD4nSbBSuh0
+
+  # WhatsApp (pública)
+  - variable: NEXT_PUBLIC_WHATSAPP_NUMBER
+    value: "56964141800"
+
+  # Supabase service role (secreta — referencia a Cloud Secret Manager)
+  # Para crearla ejecuta: firebase apphosting:secrets:set SUPABASE_SERVICE_ROLE_KEY
+  - variable: SUPABASE_SERVICE_ROLE_KEY
+    secret: SUPABASE_SERVICE_ROLE_KEY
