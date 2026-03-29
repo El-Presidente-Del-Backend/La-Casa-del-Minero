@@ -63,7 +63,7 @@ export function ProductDetailNavbar() {
       {/* Logo bar */}
       <div className="mx-auto max-w-7xl px-4 py-3">
         <Link href="/tienda" className="inline-flex items-center gap-2">
-          <Image src="/Logo.png" alt="La Casa del Minero" width={200} height={85} className="h-16 w-auto" />
+          <Image src="/casco.png" alt="La Casa del Minero" width={200} height={85} className="h-16 w-auto" />
         </Link>
       </div>
     </header>

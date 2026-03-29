@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Pickaxe, Mail, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
+import { Mail, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,7 +42,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Link href="/tienda" className="mx-auto mb-4 flex items-center gap-2">
-            <Pickaxe className="h-8 w-8 text-primary" />
+            <Image src="/casco.png" alt="La Casa del Minero" width={48} height={48} />
             <span className="font-[family-name:var(--font-heading)] text-xl font-bold uppercase tracking-wider text-foreground">
               La Casa del Minero
             </span>
