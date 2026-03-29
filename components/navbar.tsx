@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Menu, X, Pickaxe, ExternalLink } from "lucide-react"
+import Image from "next/image"
+import { Menu, X, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navLinks = [
@@ -19,10 +20,7 @@ export function Navbar() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         {/* Logo */}
         <Link href="#inicio" className="flex items-center gap-2">
-          <Pickaxe className="h-7 w-7 text-primary" />
-          <span className="font-[var(--font-heading)] text-xl font-bold uppercase tracking-wider text-foreground">
-            La Casa del Minero
-          </span>
+          <Image src="/Logo.png" alt="La Casa del Minero" width={200} height={85} className="h-16 w-auto" />
         </Link>
 
         {/* Desktop Nav */}

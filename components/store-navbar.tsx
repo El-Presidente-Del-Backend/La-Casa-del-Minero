@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Pickaxe, Search, ShoppingCart, User, Menu, X, ArrowLeft, LogOut } from "lucide-react"
+import Image from "next/image"
+import { Search, ShoppingCart, User, Menu, X, ArrowLeft, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { CategoryRecord } from "@/lib/products"
@@ -85,15 +86,7 @@ export function StoreNavbar({
       <div className="mx-auto max-w-7xl px-4 py-3">
         <div className="flex items-center gap-4">
           <Link href="/tienda" className="flex shrink-0 items-center gap-2">
-            <Pickaxe className="h-7 w-7 text-primary" />
-            <div className="flex flex-col">
-              <span className="font-[family-name:var(--font-heading)] text-lg font-bold uppercase leading-none tracking-wider text-foreground">
-                La Casa del Minero
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-primary">
-                Tienda Online
-              </span>
-            </div>
+            <Image src="/Logo.png" alt="La Casa del Minero" width={200} height={85} className="h-16 w-auto" />
           </Link>
 
           <form onSubmit={handleSearch} className="hidden flex-1 md:block">

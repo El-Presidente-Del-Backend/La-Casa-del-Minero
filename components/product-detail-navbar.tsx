@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Pickaxe, ArrowLeft, ShoppingCart, User, LogOut } from "lucide-react"
+import Image from "next/image"
+import { ArrowLeft, ShoppingCart, User, LogOut } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
 import { useCart } from "@/lib/cart/cart-context"
 import { createClient } from "@/lib/supabase/client"
@@ -62,15 +63,7 @@ export function ProductDetailNavbar() {
       {/* Logo bar */}
       <div className="mx-auto max-w-7xl px-4 py-3">
         <Link href="/tienda" className="inline-flex items-center gap-2">
-          <Pickaxe className="h-7 w-7 text-primary" />
-          <div className="flex flex-col">
-            <span className="font-[family-name:var(--font-heading)] text-lg font-bold uppercase leading-none tracking-wider text-foreground">
-              La Casa del Minero
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-widest text-primary">
-              Tienda Online
-            </span>
-          </div>
+          <Image src="/Logo.png" alt="La Casa del Minero" width={200} height={85} className="h-16 w-auto" />
         </Link>
       </div>
     </header>

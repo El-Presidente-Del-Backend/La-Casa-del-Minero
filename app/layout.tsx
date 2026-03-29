@@ -14,26 +14,13 @@ export const metadata: Metadata = {
   description: 'Tu proveedor de confianza en equipos, herramientas y suministros para la industria minera. Calidad, seguridad y experiencia al servicio de tu operación.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/Logo.png',
+    apple: '/Logo.png',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#3d2a14',
+  themeColor: '#1a5dab',
   userScalable: true,
 }
 
