@@ -11,4 +11,3 @@ node_modules/
 
 # Ignore specific files that were recently edited
 package-lock.json
-components/location-section.tsx
