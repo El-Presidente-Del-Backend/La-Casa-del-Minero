@@ -17,5 +17,4 @@ env:
 
   # Supabase service role (secreta — referencia a Cloud Secret Manager)
   # Para crearla ejecuta: firebase apphosting:secrets:set SUPABASE_SERVICE_ROLE_KEY
-  - variable: SUPABASE_SERVICE_ROLE_KEY
-    secret: SUPABASE_SERVICE_ROLE_KEY
+
