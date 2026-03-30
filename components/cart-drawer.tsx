@@ -14,9 +14,9 @@ export function CartDrawer() {
   const buildWhatsAppMessage = () => {
     let msg = "¡Hola! Me gustaría comprar:\n\n"
     items.forEach((item) => {
-      msg += `• ${item.quantity}x ${item.product.name} ($${item.product.price.toFixed(2)} c/u)\n`
+      msg += `• ${item.quantity}x ${item.product.name} ($${item.product.price.toLocaleString('es-CL')} c/u)\n`
     })
-    msg += `\n*Total: $${totalPrice.toFixed(2)}*`
+    msg += `\n*Total: $${totalPrice.toLocaleString('es-CL')}*`
     return encodeURIComponent(msg)
   }
 
@@ -67,7 +67,7 @@ export function CartDrawer() {
                         {item.product.name}
                       </h4>
                       <p className="text-sm font-bold text-primary">
-                        ${item.product.price.toFixed(2)}
+                        ${item.product.price.toLocaleString('es-CL')}
                       </p>
 
                       {/* Quantity controls */}
@@ -108,7 +108,7 @@ export function CartDrawer() {
             <div className="border-t border-border pt-4">
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Total</span>
-                <span className="text-xl font-bold text-foreground">${totalPrice.toFixed(2)}</span>
+                <span className="text-xl font-bold text-foreground">${totalPrice.toLocaleString('es-CL')}</span>
               </div>
 
               <div className="flex flex-col gap-2">

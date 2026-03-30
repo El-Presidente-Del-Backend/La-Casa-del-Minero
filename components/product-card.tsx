@@ -55,11 +55,11 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="flex items-center justify-between gap-2 pt-2">
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold text-foreground">
-              {"$"}{product.price.toFixed(2)}
+              {"$"}{product.price.toLocaleString('es-CL')}
             </span>
             {product.originalPrice && (
               <span className="text-xs text-muted-foreground line-through">
-                {"$"}{product.originalPrice.toFixed(2)}
+                {"$"}{product.originalPrice.toLocaleString('es-CL')}
               </span>
             )}
           </div>

@@ -10,12 +10,12 @@ const contactInfo = [
   {
     icon: Clock,
     label: "Horario",
-    value: "Lunes a Viernes: 8:00 - 18:00 | Sábados: 8:00 - 13:00",
+    value: "Lunes a Viernes: 9:00 - 13:00 y 15:00 - 19:00 | Sábados: 10:00 - 13:00",
   },
   {
     icon: Phone,
     label: "Teléfono",
-    value: "+56 9 1234 5678",
+    value: "+53 2 52 4090 - +56 9 4264 6032 - +56 9 8850 2742",
   },
   {
     icon: Mail,

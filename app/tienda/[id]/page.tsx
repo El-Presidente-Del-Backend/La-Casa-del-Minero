@@ -97,12 +97,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             {/* Price */}
             <div className="flex items-baseline gap-3">
               <span className="text-3xl font-bold text-foreground">
-                {"$"}{product.price.toFixed(2)}
+                {"$"}{product.price.toLocaleString('es-CL')}
               </span>
               {product.originalPrice && (
                 <>
                   <span className="text-lg text-muted-foreground line-through">
-                    {"$"}{product.originalPrice.toFixed(2)}
+                    {"$"}{product.originalPrice.toLocaleString('es-CL')}
                   </span>
                   <Badge variant="secondary" className="text-xs">
                     {Math.round((1 - product.price / product.originalPrice) * 100)}% OFF

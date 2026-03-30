@@ -20,7 +20,7 @@ export function HeroSection() {
       {/* Content */}
       <div className="relative z-10 mx-auto max-w-5xl px-6 text-center">
         <p className="mb-4 text-sm font-semibold uppercase tracking-[0.3em] text-primary">
-          Equipos & Suministros Mineros
+          Ferreteria Técnica e Hidráulica
         </p>
         <h1 className="font-[var(--font-heading)] text-5xl font-bold uppercase leading-tight tracking-tight text-foreground md:text-7xl lg:text-8xl">
           Tu aliado en{" "}
