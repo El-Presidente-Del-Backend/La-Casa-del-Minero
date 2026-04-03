@@ -57,12 +57,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {/* Product detail */}
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Image */}
-          <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card">
+          <div className="group relative aspect-square cursor-zoom-in overflow-hidden rounded-lg border border-border bg-card">
             <Image
               src={product.image}
               alt={product.name}
               fill
-              className="object-cover"
+              className="object-contain transition-transform duration-500 ease-out group-hover:scale-110"
               priority
               sizes="(max-width: 1024px) 100vw, 50vw"
             />

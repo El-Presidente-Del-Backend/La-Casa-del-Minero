@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ImageUpload } from "@/components/admin/image-upload"
 
 type Category = { id: string; name: string }
 type Spec = { label: string; value: string }
@@ -95,10 +96,11 @@ export function ProductForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="image_url">URL de imagen</Label>
-          <Input id="image_url" name="image_url" defaultValue={defaultValues?.image_url} placeholder="/images/products/..." />
-        </div>
+        <ImageUpload
+          label="Imagen del producto"
+          defaultValue={defaultValues?.image_url}
+          bucket="Products Images"
+        />
         <div className="flex flex-col gap-2">
           <Label htmlFor="badge">Badge</Label>
           <Input id="badge" name="badge" defaultValue={defaultValues?.badge ?? ""} placeholder="Ej: Nuevo, Oferta, Premium" />

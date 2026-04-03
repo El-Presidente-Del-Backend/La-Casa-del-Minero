@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, X, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ImageUpload } from "@/components/admin/image-upload"
 import { createClient } from "@/lib/supabase/client"
 import { createCategory, updateCategory, deleteCategory } from "@/app/actions/admin"
 import { useRouter } from "next/navigation"
@@ -105,15 +106,11 @@ export default function AdminCategorias() {
                   required
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="image_url">URL de imagen</Label>
-                <Input
-                  id="image_url"
-                  name="image_url"
-                  placeholder="/images/categories/..."
-                  defaultValue={editingCategory?.image_url ?? ""}
-                />
-              </div>
+              <ImageUpload
+                label="Imagen de categoría"
+                defaultValue={editingCategory?.image_url ?? ""}
+                bucket="Category Images"
+              />
             </div>
             <Button type="submit" className="gap-2 self-start">
               <Check className="h-4 w-4" />
