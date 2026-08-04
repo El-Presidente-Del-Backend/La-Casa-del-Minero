@@ -102,7 +102,7 @@ export function CartDrawer() {
         </SheetHeader>
 
         {items.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
             <ShoppingCart className="h-16 w-16 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">Tu carrito está vacío</p>
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
@@ -110,7 +110,7 @@ export function CartDrawer() {
             </Button>
           </div>
         ) : step === "contact" ? (
-          <div className="flex flex-1 flex-col gap-4 py-4">
+          <div className="flex flex-1 flex-col gap-4 px-4 py-4">
             <button
               onClick={() => setStep("cart")}
               className="flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
@@ -158,7 +158,7 @@ export function CartDrawer() {
         ) : (
           <>
             {/* Items list */}
-            <div className="flex-1 overflow-y-auto py-4">
+            <div className="flex-1 overflow-y-auto px-4 py-4">
               <div className="flex flex-col gap-4">
                 {items.map((item) => (
                   <div key={item.product.id} className="flex gap-3 rounded-lg border border-border bg-card p-3">
@@ -217,7 +217,7 @@ export function CartDrawer() {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-border pt-4">
+            <div className="border-t border-border px-4 pt-4 pb-4">
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Total</span>
                 <span className="text-xl font-bold text-foreground">${totalPrice.toLocaleString('es-CL')}</span>
