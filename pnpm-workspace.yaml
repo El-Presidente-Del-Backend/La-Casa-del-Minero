@@ -1,6 +1,15 @@
-# Ubicación canónica de la configuración de pnpm 10. El campo `pnpm` de
-# package.json no lo lee el runner de Cloud Build que usa App Hosting, y sin
-# esto el build falla con ERR_PNPM_IGNORED_BUILDS.
+# Autorización de scripts de instalación (sharp compila binarios nativos;
+# protobufjs y @firebase/util tienen postinstall).
+#
+# Se declaran las dos formas a propósito: pnpm 11 —el que instala el runner de
+# Cloud Build de App Hosting— usa `allowBuilds`, mientras que pnpm 10 usa
+# `onlyBuiltDependencies`. Con ambas, local y CI se comportan igual. Sin esto,
+# el build falla con ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  '@firebase/util': true
+  protobufjs: true
+  sharp: true
+
 onlyBuiltDependencies:
   - '@firebase/util'
   - protobufjs
