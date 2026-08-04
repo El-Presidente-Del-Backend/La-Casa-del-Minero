@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { adminDb } from '@/lib/firebase/admin'
 import { PLACEHOLDER_IMAGE } from '@/lib/products'
 import type { CategoryRecord } from '@/lib/products'
+import type { OrderItem, OrderStatus } from '@/lib/orders'
 
 /**
  * Lecturas del panel de administración. A diferencia de las de `lib/queries.ts`
@@ -100,6 +101,54 @@ export async function getAdminProductById(id: string): Promise<AdminProduct | nu
 }
 
 // ---------------------------------------------------------------------------
+// Pedidos
+// ---------------------------------------------------------------------------
+
+export type AdminOrder = {
+  id: string
+  items: OrderItem[]
+  total: number
+  status: OrderStatus
+  customerUid: string | null
+  customerEmail: string | null
+  customerName: string
+  customerPhone: string | null
+  /** Milisegundos. */
+  createdAt: number
+  updatedAt: number
+}
+
+function toAdminOrder(id: string, data: FirebaseFirestore.DocumentData): AdminOrder {
+  return {
+    id,
+    items: (data.items as OrderItem[]) ?? [],
+    total: (data.total as number) ?? 0,
+    status: (data.status as OrderStatus) ?? 'pendiente',
+    customerUid: (data.customerUid as string | null) ?? null,
+    customerEmail: (data.customerEmail as string | null) ?? null,
+    customerName: (data.customerName as string) || 'Cliente',
+    customerPhone: (data.customerPhone as string | null) ?? null,
+    createdAt: data.createdAt?.toMillis?.() ?? 0,
+    updatedAt: data.updatedAt?.toMillis?.() ?? 0,
+  }
+}
+
+/** Mismo patrón que getAdminProducts: leer todo, ordenar en memoria por createdAt desc. */
+export const getAdminOrders = cache(async (): Promise<AdminOrder[]> => {
+  const snapshot = await adminDb.collection('orders').get()
+
+  return snapshot.docs
+    .map((doc) => toAdminOrder(doc.id, doc.data()))
+    .sort((a, b) => b.createdAt - a.createdAt)
+})
+
+export async function getAdminOrderById(id: string): Promise<AdminOrder | null> {
+  const doc = await adminDb.collection('orders').doc(id).get()
+  if (!doc.exists) return null
+  return toAdminOrder(doc.id, doc.data()!)
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
 
@@ -123,9 +172,11 @@ export type AdminDashboard = {
     outOfStock: number
     inventoryValue: number
     withDiscount: number
+    pendingOrders: number
   }
   distribution: CategoryDistribution[]
   latest: AdminProduct[]
+  recentOrders: AdminOrder[]
   alerts: {
     outOfStock: AlertGroup
     missingImage: AlertGroup
@@ -152,7 +203,11 @@ function toAlertGroup(products: AdminProduct[]): AlertGroup {
  * productos el coste sigue siendo trivial frente a la cuota diaria gratuita.
  */
 export async function getAdminDashboard(): Promise<AdminDashboard> {
-  const [products, categories] = await Promise.all([getAdminProducts(), getAdminCategories()])
+  const [products, categories, orders] = await Promise.all([
+    getAdminProducts(),
+    getAdminCategories(),
+    getAdminOrders(),
+  ])
 
   const labelByCategoryId = new Map(categories.map((c) => [c.id, c.label || c.name]))
 
@@ -175,6 +230,8 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
   const distribution = Array.from(distributionMap.values()).sort((a, b) => b.count - a.count)
 
   const latest = products.slice(0, 5)
+  const pendingOrders = orders.filter((o) => o.status === 'pendiente').length
+  const recentOrders = orders.slice(0, 5)
 
   return {
     totals: {
@@ -184,9 +241,11 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
       outOfStock,
       inventoryValue,
       withDiscount,
+      pendingOrders,
     },
     distribution,
     latest,
+    recentOrders,
     alerts: {
       outOfStock: toAlertGroup(products.filter((p) => !p.inStock)),
       missingImage: toAlertGroup(

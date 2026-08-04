@@ -3,6 +3,7 @@ import Image from "next/image"
 import {
   AlertTriangle,
   CheckCircle2,
+  ClipboardList,
   DollarSign,
   ImageOff,
   ListX,
@@ -21,9 +22,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatCard } from "@/components/admin/stat-card"
 import { CategoryChart } from "@/components/admin/category-chart"
 import { getAdminDashboard, type AlertGroup } from "@/lib/admin-queries"
+import { ORDER_STATUS_LABELS } from "@/lib/orders"
 
 export default async function AdminDashboard() {
-  const { totals, distribution, latest, alerts } = await getAdminDashboard()
+  const { totals, distribution, latest, recentOrders, alerts } = await getAdminDashboard()
 
   const outOfStockPct = totals.products > 0 ? Math.round((totals.outOfStock / totals.products) * 100) : 0
 
@@ -42,7 +44,14 @@ export default async function AdminDashboard() {
         Dashboard
       </h1>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard
+          label="Pedidos pendientes"
+          value={totals.pendingOrders}
+          hint="Por confirmar"
+          icon={ClipboardList}
+          tone="text-orange-500"
+        />
         <StatCard
           label="Productos"
           value={totals.products}
@@ -136,13 +145,82 @@ export default async function AdminDashboard() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
+            <CardTitle>Últimos pedidos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no hay pedidos. Aparecerán aquí cuando un cliente compre por WhatsApp.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {recentOrders.map((o) => (
+                  <li key={o.id}>
+                    <Link
+                      href={`/admin/pedidos/${o.id}`}
+                      className="flex items-center gap-3 rounded-md p-2 hover:bg-muted"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{o.customerName}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {ORDER_STATUS_LABELS[o.status]} · {o.items.length}{" "}
+                          {o.items.length === 1 ? "producto" : "productos"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-medium text-foreground">
+                        ${o.total.toLocaleString("es-CL")}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Accesos rápidos</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Link href="/admin/pedidos">
+              <Button className="w-full justify-start gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Ver pedidos
+              </Button>
+            </Link>
+            <Link href="/admin/productos/nuevo">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Plus className="h-4 w-4" />
+                Nuevo producto
+              </Button>
+            </Link>
+            <Link href="/admin/categorias">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Tags className="h-4 w-4" />
+                Nueva categoría
+              </Button>
+            </Link>
+            <Link href="/tienda">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Store className="h-4 w-4" />
+                Ver tienda
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-3">
+          <CardHeader>
             <CardTitle>Últimos productos añadidos</CardTitle>
           </CardHeader>
           <CardContent>
             {latest.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aún no hay productos.</p>
             ) : (
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-1 sm:grid sm:grid-cols-2 sm:gap-1">
                 {latest.map((p) => (
                   <li key={p.id}>
                     <Link
@@ -164,32 +242,6 @@ export default async function AdminDashboard() {
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Accesos rápidos</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <Link href="/admin/productos/nuevo">
-              <Button className="w-full justify-start gap-2">
-                <Plus className="h-4 w-4" />
-                Nuevo producto
-              </Button>
-            </Link>
-            <Link href="/admin/categorias">
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Tags className="h-4 w-4" />
-                Nueva categoría
-              </Button>
-            </Link>
-            <Link href="/tienda">
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Store className="h-4 w-4" />
-                Ver tienda
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
