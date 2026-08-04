@@ -9,6 +9,7 @@ import { type ActionState, failState, okState } from "@/lib/action-state"
 import { slugify } from "@/lib/validations/form"
 import { productFormToRaw, productSchema, type ProductInput } from "@/lib/validations/product"
 import { categoryFormToRaw, categorySchema } from "@/lib/validations/category"
+import { orderStatusSchema } from "@/lib/validations/order"
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -281,6 +282,37 @@ export async function deleteCategory(
     revalidateAdmin()
     revalidateStore()
     return okState("Categoría eliminada")
+  } catch (err) {
+    return toFailState(err)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pedidos
+// ---------------------------------------------------------------------------
+
+export async function updateOrderStatus(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
+
+    const parsed = orderStatusSchema.safeParse(formData.get("status"))
+    if (!parsed.success) {
+      return failState("Estado inválido")
+    }
+
+    await adminDb.collection("orders").doc(id).update({
+      status: parsed.data,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+
+    revalidatePath("/admin/pedidos")
+    revalidatePath(`/admin/pedidos/${id}`)
+    revalidateAdmin()
+    return okState("Estado actualizado")
   } catch (err) {
     return toFailState(err)
   }

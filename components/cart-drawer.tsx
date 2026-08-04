@@ -1,28 +1,94 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Image from "next/image"
-import { Minus, Plus, Trash2, ShoppingCart, MessageCircle } from "lucide-react"
+import { ArrowLeft, Minus, Plus, Trash2, ShoppingCart, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useCart } from "@/lib/cart/cart-context"
+import { useUser } from "@/hooks/use-user"
+import { createOrder } from "@/app/actions/orders"
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ""
 
 export function CartDrawer() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, clearCart, totalItems, totalPrice } = useCart()
+  const { user } = useUser()
 
-  const buildWhatsAppMessage = () => {
+  const [step, setStep] = useState<"cart" | "contact">("cart")
+  const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Al cerrar el drawer, la próxima vez que se abra debe partir del carrito,
+  // no dejar al cliente a mitad del formulario de contacto de una vez anterior.
+  useEffect(() => {
+    if (!isOpen) {
+      setStep("cart")
+      setError(null)
+    }
+  }, [isOpen])
+
+  const buildWhatsAppMessage = (orderId?: string) => {
     let msg = "¡Hola! Me gustaría comprar:\n\n"
     items.forEach((item) => {
-      msg += `• ${item.quantity}x ${item.product.name} ($${item.product.price.toLocaleString('es-CL')} c/u)\n`
+      msg += `• ${item.quantity}x ${item.product.name} ($${item.product.price.toLocaleString("es-CL")} c/u)\n`
     })
-    msg += `\n*Total: $${totalPrice.toLocaleString('es-CL')}*`
+    msg += `\n*Total: $${totalPrice.toLocaleString("es-CL")}*`
+    if (orderId) msg += `\nReferencia: #${orderId.slice(0, 8)}`
     return encodeURIComponent(msg)
   }
 
-  const handleWhatsAppOrder = () => {
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${buildWhatsAppMessage()}`
-    window.open(url, "_blank")
+  const submitOrder = async (contact?: { name: string; phone: string }) => {
+    // La ventana se abre síncronamente, antes de cualquier await: si se abre
+    // después de esperar la respuesta del servidor, Safari/Chrome suelen
+    // bloquearla por no reconocerla ya como parte directa del clic.
+    const win = window.open("", "_blank")
+    setSubmitting(true)
+    setError(null)
+
+    const result = await createOrder({
+      items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+      name: contact?.name,
+      phone: contact?.phone,
+    })
+
+    setSubmitting(false)
+
+    if (!result.ok) {
+      win?.close()
+      setError(result.error)
+      return
+    }
+
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${buildWhatsAppMessage(result.orderId)}`
+    if (win) win.location.href = url
+    else window.open(url, "_blank")
+
+    clearCart()
+    setStep("cart")
+    setIsOpen(false)
+  }
+
+  const handleBuyClick = () => {
+    if (user) {
+      void submitOrder()
+    } else {
+      setError(null)
+      setStep("contact")
+    }
+  }
+
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim() || !phone.trim()) {
+      setError("Ingresa tu nombre y teléfono para continuar")
+      return
+    }
+    void submitOrder({ name: name.trim(), phone: phone.trim() })
   }
 
   return (
@@ -42,6 +108,52 @@ export function CartDrawer() {
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
               Seguir comprando
             </Button>
+          </div>
+        ) : step === "contact" ? (
+          <div className="flex flex-1 flex-col gap-4 py-4">
+            <button
+              onClick={() => setStep("cart")}
+              className="flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Volver al carrito
+            </button>
+            <p className="text-sm text-muted-foreground">
+              Antes de continuar, cuéntanos quién eres para que podamos contactarte.
+            </p>
+            <form onSubmit={handleContactSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="contact-name">Nombre</Label>
+                <Input
+                  id="contact-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Tu nombre"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="contact-phone">Teléfono</Label>
+                <Input
+                  id="contact-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+56 9 1234 5678"
+                  required
+                />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full gap-2 bg-green-600 text-white hover:bg-green-700"
+                disabled={submitting}
+              >
+                <MessageCircle className="h-5 w-5" />
+                {submitting ? "Enviando..." : "Continuar a WhatsApp"}
+              </Button>
+            </form>
           </div>
         ) : (
           <>
@@ -111,14 +223,17 @@ export function CartDrawer() {
                 <span className="text-xl font-bold text-foreground">${totalPrice.toLocaleString('es-CL')}</span>
               </div>
 
+              {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
+
               <div className="flex flex-col gap-2">
                 <Button
                   size="lg"
                   className="w-full gap-2 bg-green-600 text-white hover:bg-green-700"
-                  onClick={handleWhatsAppOrder}
+                  onClick={handleBuyClick}
+                  disabled={submitting}
                 >
                   <MessageCircle className="h-5 w-5" />
-                  Comprar por WhatsApp
+                  {submitting ? "Enviando..." : "Comprar por WhatsApp"}
                 </Button>
                 <Button variant="outline" size="sm" className="w-full" onClick={clearCart}>
                   Vaciar carrito
