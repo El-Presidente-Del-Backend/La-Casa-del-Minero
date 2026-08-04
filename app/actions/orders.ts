@@ -21,6 +21,7 @@ export type CreateOrderResult =
 export async function createOrder(input: {
   items: { productId: string; quantity: number }[]
   name?: string
+  email?: string
   phone?: string
 }): Promise<CreateOrderResult> {
   try {
@@ -32,8 +33,8 @@ export async function createOrder(input: {
 
     const user = await getCurrentUser()
 
-    if (!user && (!data.name || !data.phone)) {
-      return { ok: false, error: "Ingresa tu nombre y teléfono para continuar" }
+    if (!user && (!data.name || !data.email || !data.phone)) {
+      return { ok: false, error: "Ingresa tu nombre, email y teléfono para continuar" }
     }
 
     // El carrito es estado de cliente (localStorage): nunca se confía en el
@@ -71,7 +72,7 @@ export async function createOrder(input: {
       total,
       status: "pendiente",
       customerUid: user?.uid ?? null,
-      customerEmail: user?.email ?? null,
+      customerEmail: user?.email ?? data.email ?? null,
       customerName,
       customerPhone: user ? null : data.phone ?? null,
       createdAt: FieldValue.serverTimestamp(),

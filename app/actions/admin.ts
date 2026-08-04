@@ -10,6 +10,8 @@ import { slugify } from "@/lib/validations/form"
 import { productFormToRaw, productSchema, type ProductInput } from "@/lib/validations/product"
 import { categoryFormToRaw, categorySchema } from "@/lib/validations/category"
 import { orderStatusSchema } from "@/lib/validations/order"
+import { sendOrderStatusEmail } from "@/lib/email"
+import type { OrderItem } from "@/lib/orders"
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -291,6 +293,8 @@ export async function deleteCategory(
 // Pedidos
 // ---------------------------------------------------------------------------
 
+const NOTIFIABLE_STATUSES = new Set(["confirmado", "enviado"])
+
 export async function updateOrderStatus(
   id: string,
   _prevState: ActionState,
@@ -303,11 +307,43 @@ export async function updateOrderStatus(
     if (!parsed.success) {
       return failState("Estado inválido")
     }
+    const newStatus = parsed.data
 
-    await adminDb.collection("orders").doc(id).update({
-      status: parsed.data,
+    const ref = adminDb.collection("orders").doc(id)
+    const doc = await ref.get()
+    if (!doc.exists) {
+      return failState("El pedido no existe")
+    }
+    const order = doc.data()!
+    const previousStatus = order.status as string | undefined
+
+    await ref.update({
+      status: newStatus,
       updatedAt: FieldValue.serverTimestamp(),
     })
+
+    // El correo es un efecto secundario best-effort: si falla (o el secreto
+    // de Resend todavía no está configurado), el cambio de estado igual queda
+    // guardado — solo se registra el error en el servidor.
+    const customerEmail = order.customerEmail as string | null
+    if (newStatus !== previousStatus && NOTIFIABLE_STATUSES.has(newStatus) && customerEmail) {
+      // Se espera el envío (en vez de fire-and-forget) para que no quede a
+      // medias si el proceso se recicla apenas termina esta acción — el
+      // try/catch de más abajo asegura que un fallo de Resend no rompa el
+      // cambio de estado, que ya quedó guardado en la línea de arriba.
+      try {
+        await sendOrderStatusEmail({
+          to: customerEmail,
+          customerName: (order.customerName as string) || "Cliente",
+          items: (order.items as OrderItem[]) ?? [],
+          total: (order.total as number) ?? 0,
+          status: newStatus as "confirmado" | "enviado",
+          orderId: id,
+        })
+      } catch (err) {
+        console.error(`No se pudo enviar el correo del pedido ${id}:`, err)
+      }
+    }
 
     revalidatePath("/admin/pedidos")
     revalidatePath(`/admin/pedidos/${id}`)
