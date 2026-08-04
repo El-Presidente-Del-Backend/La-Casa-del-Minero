@@ -1,30 +1,13 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Pickaxe, LayoutDashboard, Package, Tags, LogOut } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/firebase/session"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
+  const user = await getCurrentUser()
 
-  // Try getUser first (verifies with Supabase), fallback to getSession (reads cookie)
-  let userId: string | null = null
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    userId = user.id
-  } else {
-    const { data: { session } } = await supabase.auth.getSession()
-    userId = session?.user?.id ?? null
-  }
-
-  if (!userId) redirect("/auth/login")
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single()
-
-  if (profile?.role !== "admin") redirect("/tienda")
+  if (!user) redirect("/auth/login")
+  if (!user.isAdmin) redirect("/tienda")
 
   return (
     <div className="flex min-h-screen">

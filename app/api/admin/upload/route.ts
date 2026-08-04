@@ -1,50 +1,74 @@
+import { randomUUID } from "node:crypto"
 import { NextRequest, NextResponse } from "next/server"
-import { createClient as createServiceClient } from "@supabase/supabase-js"
-import { createClient } from "@/lib/supabase/server"
+import { adminBucket } from "@/lib/firebase/admin"
+import { requireAdmin } from "@/lib/firebase/session"
+
+// El destino llega desde el navegador, así que se valida contra una lista fija
+// en lugar de confiar en el valor recibido.
+const FOLDERS = ["products", "categories"]
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"]
+const MAX_BYTES = 5 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
-  // Verificar que sea admin
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (profile?.role !== "admin") {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 })
+  try {
+    await requireAdmin()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No autorizado"
+    const status = message === "No autenticado" ? 401 : 403
+    return NextResponse.json({ error: message }, { status })
   }
 
-  // Usar service role para saltarse RLS en Storage
-  const adminClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  let formData: FormData
+  try {
+    formData = await request.formData()
+  } catch {
+    return NextResponse.json({ error: "La petición está malformada" }, { status: 400 })
+  }
 
-  const formData = await request.formData()
-  const file = formData.get("file") as File
-  const bucket = formData.get("bucket") as string
+  const file = formData.get("file")
+  const folder = formData.get("folder")
 
-  if (!file || !bucket) {
+  if (!(file instanceof File) || typeof folder !== "string") {
     return NextResponse.json({ error: "Faltan datos" }, { status: 400 })
   }
 
-  const ext = file.name.split(".").pop()
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  if (!FOLDERS.includes(folder)) {
+    return NextResponse.json({ error: "Destino no permitido" }, { status: 400 })
+  }
 
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return NextResponse.json(
+      { error: "El archivo debe ser una imagen JPG, PNG, WebP, AVIF o GIF" },
+      { status: 400 }
+    )
+  }
 
-  const { data, error } = await adminClient.storage
-    .from(bucket)
-    .upload(filename, buffer, { contentType: file.type, upsert: true })
+  if (file.size > MAX_BYTES) {
+    return NextResponse.json({ error: "La imagen no puede superar los 5 MB" }, { status: 400 })
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg"
+  const path = `${folder}/${Date.now()}-${randomUUID().slice(0, 8)}.${extension}`
 
-  const { data: { publicUrl } } = adminClient.storage.from(bucket).getPublicUrl(data.path)
+  // El token de descarga hace la imagen accesible por URL pública sin depender
+  // de permisos por objeto, que el bucket rechaza al usar acceso uniforme.
+  const downloadToken = randomUUID()
+  const buffer = Buffer.from(await file.arrayBuffer())
 
-  return NextResponse.json({ url: publicUrl })
+  try {
+    await adminBucket.file(path).save(buffer, {
+      contentType: file.type,
+      metadata: {
+        cacheControl: "public, max-age=31536000, immutable",
+        metadata: { firebaseStorageDownloadTokens: downloadToken },
+      },
+    })
+  } catch (error) {
+    console.error("upload error:", error)
+    return NextResponse.json({ error: "No se pudo subir la imagen" }, { status: 500 })
+  }
+
+  const url = `https://firebasestorage.googleapis.com/v0/b/${adminBucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${downloadToken}`
+
+  return NextResponse.json({ url })
 }

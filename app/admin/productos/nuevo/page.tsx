@@ -1,12 +1,11 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { getCategoryOptions } from "@/lib/admin-queries"
 import { createProduct } from "@/app/actions/admin"
 import { ProductForm } from "../product-form"
 
 export default async function NuevoProducto() {
-  const supabase = await createClient()
-  const { data: categories } = await supabase.from("categories").select("id, name").order("name")
+  const categories = await getCategoryOptions()
 
   return (
     <div>
@@ -17,7 +16,7 @@ export default async function NuevoProducto() {
         Nuevo Producto
       </h1>
       <ProductForm
-        categories={categories ?? []}
+        categories={categories}
         action={createProduct}
         submitLabel="Crear Producto"
       />

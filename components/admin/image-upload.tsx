@@ -9,10 +9,10 @@ interface ImageUploadProps {
   label: string
   name?: string
   defaultValue?: string
-  bucket: "Products Images" | "Category Images"
+  folder: "products" | "categories"
 }
 
-export function ImageUpload({ label, name = "image_url", defaultValue, bucket }: ImageUploadProps) {
+export function ImageUpload({ label, name = "image_url", defaultValue, folder }: ImageUploadProps) {
   const [url, setUrl] = useState(defaultValue ?? "")
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +29,7 @@ export function ImageUpload({ label, name = "image_url", defaultValue, bucket }:
 
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("bucket", bucket)
+    formData.append("folder", folder)
 
     const res = await fetch("/api/admin/upload", { method: "POST", body: formData })
     const data = await res.json()

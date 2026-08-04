@@ -1,68 +1,94 @@
 import { unstable_cache } from 'next/cache'
-import { createStaticClient } from '@/lib/supabase/static'
-import type { Product, Category } from '@/lib/products'
+import { adminDb } from '@/lib/firebase/admin'
+import { PLACEHOLDER_IMAGE, type CategoryRecord, type Product } from '@/lib/products'
 
 // ---------------------------------------------------------------------------
-// Supabase row → Product transformer
+// Documento de Firestore → Product
 // ---------------------------------------------------------------------------
 
-interface SupabaseProductRow {
-  id: string
-  name: string
-  description: string
-  long_description: string
-  price: number
-  original_price: number | null
-  category_id: string
-  image_url: string
-  badge: string | null
-  in_stock: boolean
-  sku: string
-  categories: { name: string } | null
-  product_specs: { label: string; value: string }[]
+interface ProductDoc {
+  name?: string
+  description?: string
+  longDescription?: string
+  price?: number
+  originalPrice?: number | null
+  categoryId?: string | null
+  categoryName?: string
+  imageUrl?: string
+  badge?: string | null
+  inStock?: boolean
+  sku?: string
+  specs?: { label: string; value: string }[]
+  createdAt?: FirebaseFirestore.Timestamp | null
 }
 
-function toProduct(row: SupabaseProductRow): Product {
+interface CategoryDoc {
+  name?: string
+  slug?: string
+  label?: string
+  imageUrl?: string | null
+}
+
+function toProduct(id: string, doc: ProductDoc): Product {
   return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    longDescription: row.long_description,
-    price: row.price,
-    ...(row.original_price != null ? { originalPrice: row.original_price } : {}),
-    category: row.categories?.name ?? "",
-    image: row.image_url,
-    ...(row.badge != null ? { badge: row.badge } : {}),
-    inStock: row.in_stock,
-    sku: row.sku,
-    specs: row.product_specs ?? [],
+    id,
+    name: doc.name ?? '',
+    description: doc.description ?? '',
+    longDescription: doc.longDescription ?? '',
+    price: doc.price ?? 0,
+    ...(doc.originalPrice != null ? { originalPrice: doc.originalPrice } : {}),
+    category: doc.categoryName ?? '',
+    image: doc.imageUrl || PLACEHOLDER_IMAGE,
+    ...(doc.badge ? { badge: doc.badge } : {}),
+    inStock: doc.inStock ?? true,
+    sku: doc.sku ?? '',
+    specs: doc.specs ?? [],
   }
 }
 
-const PRODUCT_SELECT = `
-  *,
-  categories(name),
-  product_specs(label, value)
-` as const
+function toCategory(id: string, doc: CategoryDoc): CategoryRecord {
+  return {
+    id,
+    name: doc.name ?? '',
+    slug: doc.slug ?? '',
+    label: doc.label ?? doc.name ?? '',
+    image_url: doc.imageUrl ?? null,
+  }
+}
 
-const supabase = createStaticClient()
+/**
+ * Se ordena en memoria en lugar de con `orderBy('createdAt')`: Firestore excluye
+ * de una consulta ordenada los documentos que no tengan ese campo, y un
+ * producto sin `createdAt` desaparecería de la tienda sin dejar rastro.
+ */
+function byNewest(a: { createdAt: number }, b: { createdAt: number }) {
+  return b.createdAt - a.createdAt
+}
+
+function createdAtMillis(doc: ProductDoc): number {
+  return doc.createdAt?.toMillis() ?? 0
+}
 
 // ---------------------------------------------------------------------------
-// Cached data-fetching functions
+// Lecturas cacheadas
 // ---------------------------------------------------------------------------
 
 export const getProducts = unstable_cache(
   async (): Promise<Product[]> => {
-    const { data, error } = await supabase
-      .from('products')
-      .select(PRODUCT_SELECT)
+    try {
+      const snapshot = await adminDb.collection('products').get()
 
-    if (error) {
-      console.error('getProducts error:', error.message)
+      return snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as ProductDoc
+          return { product: toProduct(doc.id, data), createdAt: createdAtMillis(data) }
+        })
+        .sort(byNewest)
+        .map((entry) => entry.product)
+    } catch (error) {
+      console.error('getProducts error:', error)
       return []
     }
-
-    return (data as unknown as SupabaseProductRow[]).map(toProduct)
   },
   ['products'],
   { revalidate: 60 }
@@ -70,18 +96,15 @@ export const getProducts = unstable_cache(
 
 export const getProductById = unstable_cache(
   async (id: string): Promise<Product | undefined> => {
-    const { data, error } = await supabase
-      .from('products')
-      .select(PRODUCT_SELECT)
-      .eq('id', id)
-      .single()
+    try {
+      const doc = await adminDb.collection('products').doc(id).get()
+      if (!doc.exists) return undefined
 
-    if (error || !data) {
-      console.error('getProductById error:', error?.message)
+      return toProduct(doc.id, doc.data() as ProductDoc)
+    } catch (error) {
+      console.error('getProductById error:', error)
       return undefined
     }
-
-    return toProduct(data as unknown as SupabaseProductRow)
   },
   ['product-by-id'],
   { revalidate: 60 }
@@ -89,47 +112,46 @@ export const getProductById = unstable_cache(
 
 export const getRelatedProducts = unstable_cache(
   async (productId: string, limit = 4): Promise<Product[]> => {
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('category_id')
-      .eq('id', productId)
-      .single()
+    try {
+      const current = await adminDb.collection('products').doc(productId).get()
+      if (!current.exists) return []
 
-    if (productError || !product) {
-      console.error('getRelatedProducts error (lookup):', productError?.message)
+      const categoryId = (current.data() as ProductDoc).categoryId
+      if (!categoryId) return []
+
+      // Se pide uno de más porque el propio producto entra en el resultado y se
+      // descarta después: filtrarlo en la consulta exigiría un índice compuesto.
+      const snapshot = await adminDb
+        .collection('products')
+        .where('categoryId', '==', categoryId)
+        .limit(limit + 1)
+        .get()
+
+      return snapshot.docs
+        .filter((doc) => doc.id !== productId)
+        .slice(0, limit)
+        .map((doc) => toProduct(doc.id, doc.data() as ProductDoc))
+    } catch (error) {
+      console.error('getRelatedProducts error:', error)
       return []
     }
-
-    const { data, error } = await supabase
-      .from('products')
-      .select(PRODUCT_SELECT)
-      .eq('category_id', product.category_id)
-      .neq('id', productId)
-      .limit(limit)
-
-    if (error) {
-      console.error('getRelatedProducts error:', error.message)
-      return []
-    }
-
-    return (data as unknown as SupabaseProductRow[]).map(toProduct)
   },
   ['related-products'],
   { revalidate: 60 }
 )
 
 export const getCategories = unstable_cache(
-  async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, name, slug, label, image_url')
+  async (): Promise<CategoryRecord[]> => {
+    try {
+      const snapshot = await adminDb.collection('categories').get()
 
-    if (error) {
-      console.error('getCategories error:', error.message)
+      return snapshot.docs
+        .map((doc) => toCategory(doc.id, doc.data() as CategoryDoc))
+        .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+    } catch (error) {
+      console.error('getCategories error:', error)
       return []
     }
-
-    return data
   },
   ['categories'],
   { revalidate: 60 }

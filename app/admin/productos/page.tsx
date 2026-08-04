@@ -3,16 +3,47 @@ import Image from "next/image"
 import { Plus, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/server"
+import { adminDb } from "@/lib/firebase/admin"
+import { PLACEHOLDER_IMAGE } from "@/lib/products"
 import { DeleteProductButton } from "./delete-button"
 
-export default async function AdminProductos() {
-  const supabase = await createClient()
+type AdminProduct = {
+  id: string
+  name: string
+  sku: string
+  categoryName: string
+  price: number
+  imageUrl: string
+  badge: string | null
+  inStock: boolean
+  createdAt: number
+}
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("*, categories(name)")
-    .order("created_at", { ascending: false })
+async function getAdminProducts(): Promise<AdminProduct[]> {
+  const snapshot = await adminDb.collection("products").get()
+
+  // Se ordena en memoria por el mismo motivo que en lib/queries.ts: un producto
+  // sin `createdAt` quedaría fuera de una consulta con orderBy.
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        name: (data.name as string) ?? "",
+        sku: (data.sku as string) ?? "",
+        categoryName: (data.categoryName as string) || "—",
+        price: (data.price as number) ?? 0,
+        imageUrl: (data.imageUrl as string) || PLACEHOLDER_IMAGE,
+        badge: (data.badge as string | null) ?? null,
+        inStock: (data.inStock as boolean) ?? true,
+        createdAt: data.createdAt?.toMillis() ?? 0,
+      }
+    })
+    .sort((a, b) => b.createdAt - a.createdAt)
+}
+
+export default async function AdminProductos() {
+  const products = await getAdminProducts()
 
   return (
     <div>
@@ -41,12 +72,12 @@ export default async function AdminProductos() {
             </tr>
           </thead>
           <tbody>
-            {products?.map((product) => (
+            {products.map((product) => (
               <tr key={product.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                      <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="40px" />
+                      <Image src={product.imageUrl} alt={product.name} fill className="object-cover" sizes="40px" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">{product.name}</p>
@@ -56,13 +87,13 @@ export default async function AdminProductos() {
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">{product.sku}</td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">
-                  {(product.categories as { name: string } | null)?.name ?? "—"}
+                  {product.categoryName}
                 </td>
                 <td className="px-4 py-3 text-right text-sm font-medium text-foreground">
-                  ${product.price}
+                  ${product.price.toLocaleString("es-CL")}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${product.in_stock ? "bg-green-500" : "bg-red-500"}`} />
+                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${product.inStock ? "bg-green-500" : "bg-red-500"}`} />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">

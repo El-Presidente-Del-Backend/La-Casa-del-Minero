@@ -6,7 +6,9 @@ import Image from "next/image"
 import { ArrowLeft, ShoppingCart, User, LogOut } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
 import { useCart } from "@/lib/cart/cart-context"
-import { createClient } from "@/lib/supabase/client"
+import { signOut } from "firebase/auth"
+import { getFirebaseAuth } from "@/lib/firebase/client"
+import { destroyServerSession } from "@/lib/firebase/auth-client"
 
 export function ProductDetailNavbar() {
   const router = useRouter()
@@ -14,8 +16,8 @@ export function ProductDetailNavbar() {
   const { totalItems, setIsOpen: setCartOpen } = useCart()
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut(getFirebaseAuth())
+    await destroyServerSession()
     router.refresh()
   }
   return (

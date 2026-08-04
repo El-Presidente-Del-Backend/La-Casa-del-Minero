@@ -99,7 +99,7 @@ export function ProductForm({
         <ImageUpload
           label="Imagen del producto"
           defaultValue={defaultValues?.image_url}
-          bucket="Products Images"
+          folder="products"
         />
         <div className="flex flex-col gap-2">
           <Label htmlFor="badge">Badge</Label>

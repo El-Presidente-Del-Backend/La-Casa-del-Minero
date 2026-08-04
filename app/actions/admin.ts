@@ -1,128 +1,28 @@
 "use server"
 
+import { FieldValue } from "firebase-admin/firestore"
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { adminDb } from "@/lib/firebase/admin"
+import { requireAdmin } from "@/lib/firebase/session"
+import { PLACEHOLDER_IMAGE } from "@/lib/products"
 
-async function assertAdmin() {
-  const supabase = await createClient()
-
-  let userId: string | null = null
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    userId = user.id
-  } else {
-    const { data: { session } } = await supabase.auth.getSession()
-    userId = session?.user?.id ?? null
-  }
-  if (!userId) throw new Error("No autenticado")
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single()
-
-  if (profile?.role !== "admin") throw new Error("No autorizado")
-  return supabase
-}
-
-export async function createProduct(formData: FormData) {
-  const supabase = await assertAdmin()
-
-  const specs: { label: string; value: string }[] = []
-  const specLabels = formData.getAll("spec_label") as string[]
-  const specValues = formData.getAll("spec_value") as string[]
-  specLabels.forEach((label, i) => {
-    if (label && specValues[i]) specs.push({ label, value: specValues[i] })
-  })
-
-  const { data: product, error } = await supabase
-    .from("products")
-    .insert({
-      name: formData.get("name") as string,
-      description: formData.get("description") as string,
-      long_description: formData.get("long_description") as string,
-      price: parseFloat(formData.get("price") as string),
-      original_price: formData.get("original_price") ? parseFloat(formData.get("original_price") as string) : null,
-      category_id: formData.get("category_id") as string,
-      image_url: formData.get("image_url") as string || "/images/products/placeholder.jpg",
-      badge: (formData.get("badge") as string) || null,
-      in_stock: formData.get("in_stock") === "on",
-      sku: formData.get("sku") as string,
-    })
-    .select("id")
-    .single()
-
-  if (error) throw new Error(error.message)
-
-  if (specs.length > 0 && product) {
-    await supabase.from("product_specs").insert(
-      specs.map((s) => ({ product_id: product.id, ...s }))
-    )
-  }
-
-  revalidatePath("/admin/productos")
-  revalidatePath("/tienda")
-  revalidatePath("/tienda/[id]", "page")
-  redirect("/admin/productos")
-}
-
-export async function updateProduct(id: string, formData: FormData) {
-  const supabase = await assertAdmin()
-
-  const specs: { label: string; value: string }[] = []
-  const specLabels = formData.getAll("spec_label") as string[]
-  const specValues = formData.getAll("spec_value") as string[]
-  specLabels.forEach((label, i) => {
-    if (label && specValues[i]) specs.push({ label, value: specValues[i] })
-  })
-
-  const { error } = await supabase
-    .from("products")
-    .update({
-      name: formData.get("name") as string,
-      description: formData.get("description") as string,
-      long_description: formData.get("long_description") as string,
-      price: parseFloat(formData.get("price") as string),
-      original_price: formData.get("original_price") ? parseFloat(formData.get("original_price") as string) : null,
-      category_id: formData.get("category_id") as string,
-      image_url: formData.get("image_url") as string || "/images/products/placeholder.jpg",
-      badge: (formData.get("badge") as string) || null,
-      in_stock: formData.get("in_stock") === "on",
-      sku: formData.get("sku") as string,
-    })
-    .eq("id", id)
-
-  if (error) throw new Error(error.message)
-
-  // Replace specs: delete old, insert new
-  await supabase.from("product_specs").delete().eq("product_id", id)
-  if (specs.length > 0) {
-    await supabase.from("product_specs").insert(
-      specs.map((s) => ({ product_id: id, ...s }))
-    )
-  }
-
-  revalidatePath("/admin/productos")
-  revalidatePath("/tienda")
-  revalidatePath("/tienda/[id]", "page")
-  redirect("/admin/productos")
-}
-
-export async function deleteProduct(id: string) {
-  const supabase = await assertAdmin()
-
-  const { error } = await supabase.from("products").delete().eq("id", id)
-  if (error) throw new Error(error.message)
-
-  revalidatePath("/admin/productos")
-  revalidatePath("/tienda")
-}
+type Spec = { label: string; value: string }
 
 // ---------------------------------------------------------------------------
-// Categories
+// Utilidades
 // ---------------------------------------------------------------------------
+
+function parseSpecs(formData: FormData): Spec[] {
+  const labels = formData.getAll("spec_label") as string[]
+  const values = formData.getAll("spec_value") as string[]
+
+  const specs: Spec[] = []
+  labels.forEach((label, i) => {
+    if (label && values[i]) specs.push({ label, value: values[i] })
+  })
+  return specs
+}
 
 function slugify(text: string): string {
   return text
@@ -133,52 +33,181 @@ function slugify(text: string): string {
     .replace(/(^-|-$)/g, "")
 }
 
+/**
+ * Firestore no tiene restricciones UNIQUE como las que aplicaba Postgres sobre
+ * `products.sku` y `categories.name`, así que se comprueban a mano.
+ */
+async function assertFieldIsFree(
+  collection: string,
+  field: string,
+  value: string,
+  exceptId?: string
+) {
+  const snapshot = await adminDb.collection(collection).where(field, "==", value).get()
+  const clash = snapshot.docs.some((doc) => doc.id !== exceptId)
+  if (clash) throw new Error(`Ya existe un registro con ${field} "${value}"`)
+}
+
+/**
+ * El nombre de la categoría se guarda dentro de cada producto para evitar una
+ * lectura extra por producto al pintar la tienda (Firestore no hace joins).
+ */
+async function resolveCategoryName(categoryId: string): Promise<string> {
+  const doc = await adminDb.collection("categories").doc(categoryId).get()
+  if (!doc.exists) throw new Error("La categoría seleccionada no existe")
+  return (doc.data()?.name as string | undefined) ?? ""
+}
+
+/** Aplica una escritura a muchos documentos respetando el límite de 500 por lote. */
+async function updateInBatches(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[],
+  data: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>
+) {
+  const CHUNK = 400
+  for (let i = 0; i < docs.length; i += CHUNK) {
+    const batch = adminDb.batch()
+    docs.slice(i, i + CHUNK).forEach((doc) => batch.update(doc.ref, data))
+    await batch.commit()
+  }
+}
+
+function productFromForm(formData: FormData, categoryName: string) {
+  const originalPrice = formData.get("original_price") as string
+
+  return {
+    name: formData.get("name") as string,
+    description: formData.get("description") as string,
+    longDescription: (formData.get("long_description") as string) ?? "",
+    price: parseFloat(formData.get("price") as string),
+    originalPrice: originalPrice ? parseFloat(originalPrice) : null,
+    categoryId: formData.get("category_id") as string,
+    categoryName,
+    imageUrl: (formData.get("image_url") as string) || PLACEHOLDER_IMAGE,
+    badge: (formData.get("badge") as string) || null,
+    inStock: formData.get("in_stock") === "on",
+    sku: formData.get("sku") as string,
+    specs: parseSpecs(formData),
+  }
+}
+
+function revalidateStore() {
+  revalidatePath("/tienda")
+  revalidatePath("/tienda/[id]", "page")
+}
+
+// ---------------------------------------------------------------------------
+// Productos
+// ---------------------------------------------------------------------------
+
+export async function createProduct(formData: FormData) {
+  await requireAdmin()
+
+  const sku = formData.get("sku") as string
+  await assertFieldIsFree("products", "sku", sku)
+
+  const categoryName = await resolveCategoryName(formData.get("category_id") as string)
+
+  await adminDb.collection("products").add({
+    ...productFromForm(formData, categoryName),
+    createdAt: FieldValue.serverTimestamp(),
+  })
+
+  revalidatePath("/admin/productos")
+  revalidateStore()
+  redirect("/admin/productos")
+}
+
+export async function updateProduct(id: string, formData: FormData) {
+  await requireAdmin()
+
+  const sku = formData.get("sku") as string
+  await assertFieldIsFree("products", "sku", sku, id)
+
+  const categoryName = await resolveCategoryName(formData.get("category_id") as string)
+
+  // Las especificaciones viven dentro del documento, así que reemplazar el array
+  // sustituye al delete + insert sobre product_specs que hacía la versión SQL.
+  await adminDb
+    .collection("products")
+    .doc(id)
+    .update(productFromForm(formData, categoryName))
+
+  revalidatePath("/admin/productos")
+  revalidateStore()
+  redirect("/admin/productos")
+}
+
+export async function deleteProduct(id: string) {
+  await requireAdmin()
+
+  await adminDb.collection("products").doc(id).delete()
+
+  revalidatePath("/admin/productos")
+  revalidateStore()
+}
+
+// ---------------------------------------------------------------------------
+// Categorías
+// ---------------------------------------------------------------------------
+
 export async function createCategory(formData: FormData) {
-  const supabase = await assertAdmin()
+  await requireAdmin()
 
   const name = (formData.get("name") as string).trim()
   const label = (formData.get("label") as string).trim()
-  const image_url = (formData.get("image_url") as string).trim() || null
+  const imageUrl = ((formData.get("image_url") as string) ?? "").trim() || null
 
-  const { error } = await supabase.from("categories").insert({
+  await assertFieldIsFree("categories", "name", name)
+
+  await adminDb.collection("categories").add({
     name,
     slug: slugify(name),
     label,
-    image_url,
+    imageUrl,
+    createdAt: FieldValue.serverTimestamp(),
   })
 
-  if (error) throw new Error(error.message)
-
+  // Sin redirect: el formulario de categorías es inline, así que basta con
+  // revalidar para que el Server Component vuelva a pintar la tabla.
   revalidatePath("/admin/categorias")
-  revalidatePath("/tienda")
-  redirect("/admin/categorias")
+  revalidateStore()
 }
 
 export async function updateCategory(id: string, formData: FormData) {
-  const supabase = await assertAdmin()
+  await requireAdmin()
 
   const name = (formData.get("name") as string).trim()
   const label = (formData.get("label") as string).trim()
-  const image_url = (formData.get("image_url") as string).trim() || null
+  const imageUrl = ((formData.get("image_url") as string) ?? "").trim() || null
 
-  const { error } = await supabase
-    .from("categories")
-    .update({ name, slug: slugify(name), label, image_url })
-    .eq("id", id)
+  await assertFieldIsFree("categories", "name", name, id)
 
-  if (error) throw new Error(error.message)
+  await adminDb.collection("categories").doc(id).update({
+    name,
+    slug: slugify(name),
+    label,
+    imageUrl,
+  })
+
+  // Al renombrar hay que propagar el nombre desnormalizado a sus productos.
+  const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
+  await updateInBatches(affected.docs, { categoryName: name })
 
   revalidatePath("/admin/categorias")
-  revalidatePath("/tienda")
-  redirect("/admin/categorias")
+  revalidatePath("/admin/productos")
+  revalidateStore()
 }
 
 export async function deleteCategory(id: string) {
-  const supabase = await assertAdmin()
+  await requireAdmin()
 
-  const { error } = await supabase.from("categories").delete().eq("id", id)
-  if (error) throw new Error(error.message)
+  // Equivalente al ON DELETE SET NULL que tenía la clave foránea en Postgres.
+  const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
+  await updateInBatches(affected.docs, { categoryId: null, categoryName: "" })
+
+  await adminDb.collection("categories").doc(id).delete()
 
   revalidatePath("/admin/categorias")
-  revalidatePath("/tienda")
+  revalidatePath("/admin/productos")
+  revalidateStore()
 }

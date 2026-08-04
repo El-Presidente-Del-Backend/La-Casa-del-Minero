@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Las imágenes de productos y categorías son públicas; las subidas se hacen
+// desde /api/admin/upload con el Admin SDK, que no pasa por estas reglas.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

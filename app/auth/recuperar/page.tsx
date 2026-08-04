@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/client"
+import { sendPasswordResetEmail } from "firebase/auth"
+import { getFirebaseAuth } from "@/lib/firebase/client"
+import { authErrorCode, authErrorMessage } from "@/lib/firebase/auth-client"
 
 export default function RecuperarPage() {
   const [email, setEmail] = useState("")
@@ -20,15 +22,18 @@ export default function RecuperarPage() {
     setError("")
     setLoading(true)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/login`,
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
+    try {
+      await sendPasswordResetEmail(getFirebaseAuth(), email, {
+        url: `${window.location.origin}/auth/login`,
+      })
+    } catch (err) {
+      // Un correo inexistente no se distingue de uno válido: el mensaje de
+      // éxito ya está redactado para no revelar qué cuentas existen.
+      if (authErrorCode(err) !== "auth/user-not-found") {
+        setError(authErrorMessage(err, "No se pudo enviar el correo. Inténtalo de nuevo."))
+        setLoading(false)
+        return
+      }
     }
 
     setSuccess(true)

@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/client"
+import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "firebase/auth"
+import { getFirebaseAuth } from "@/lib/firebase/client"
+import { authErrorMessage, createServerSession } from "@/lib/firebase/auth-client"
 
 export default function RegistroPage() {
   const [name, setName] = useState("")
@@ -35,15 +37,13 @@ export default function RegistroPage() {
 
     setLoading(true)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: name } },
-    })
-
-    if (error) {
-      setError(error.message)
+    try {
+      const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password)
+      await updateProfile(credential.user, { displayName: name })
+      await sendEmailVerification(credential.user)
+      await createServerSession(credential.user, name)
+    } catch (err) {
+      setError(authErrorMessage(err, "No se pudo crear la cuenta. Inténtalo de nuevo."))
       setLoading(false)
       return
     }
@@ -63,15 +63,15 @@ export default function RegistroPage() {
                 La Casa del Minero
               </span>
             </Link>
-            <CardTitle className="text-xl">Revisa tu correo</CardTitle>
+            <CardTitle className="text-xl">¡Cuenta creada!</CardTitle>
             <CardDescription>
-              Hemos enviado un enlace de confirmación a <strong>{email}</strong>. Revisa tu bandeja de entrada para activar tu cuenta.
+              Tu sesión ya está iniciada. Te enviamos un correo de verificación a <strong>{email}</strong> para confirmar tu dirección.
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex flex-col gap-4">
-            <Link href="/auth/login" className="w-full">
-              <Button variant="outline" className="w-full">
-                Ir a iniciar sesión
+            <Link href="/tienda" className="w-full">
+              <Button className="w-full">
+                Ir a la tienda
               </Button>
             </Link>
             <Link href="/tienda" className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">

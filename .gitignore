@@ -11,3 +11,6 @@ node_modules/
 
 # Ignore specific files that were recently edited
 package-lock.json
+
+# Artefacto incremental de TypeScript (lo genera `tsc --noEmit`)
+tsconfig.tsbuildinfo

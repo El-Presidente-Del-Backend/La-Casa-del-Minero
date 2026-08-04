@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/client"
+import { signInWithEmailAndPassword } from "firebase/auth"
+import { getFirebaseAuth } from "@/lib/firebase/client"
+import { authErrorMessage, createServerSession } from "@/lib/firebase/auth-client"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -24,11 +26,11 @@ export default function LoginPage() {
     setError("")
     setLoading(true)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError("Credenciales incorrectas. Verifica tu correo y contraseña.")
+    try {
+      const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
+      await createServerSession(credential.user)
+    } catch (err) {
+      setError(authErrorMessage(err, "Credenciales incorrectas. Verifica tu correo y contraseña."))
       setLoading(false)
       return
     }

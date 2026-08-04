@@ -1,27 +1,27 @@
 import { Package, Tags, AlertTriangle, Users } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/server"
+import { adminDb } from "@/lib/firebase/admin"
+
+// Las agregaciones count() de Firestore devuelven el total sin descargar los
+// documentos, igual que hacía el `head: true` de Supabase.
+async function countDocs(query: FirebaseFirestore.Query): Promise<number> {
+  const snapshot = await query.count().get()
+  return snapshot.data().count
+}
 
 export default async function AdminDashboard() {
-  const supabase = await createClient()
-
-  const [
-    { count: productCount },
-    { count: categoryCount },
-    { count: outOfStockCount },
-    { count: userCount },
-  ] = await Promise.all([
-    supabase.from("products").select("*", { count: "exact", head: true }),
-    supabase.from("categories").select("*", { count: "exact", head: true }),
-    supabase.from("products").select("*", { count: "exact", head: true }).eq("in_stock", false),
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
+  const [productCount, categoryCount, outOfStockCount, userCount] = await Promise.all([
+    countDocs(adminDb.collection("products")),
+    countDocs(adminDb.collection("categories")),
+    countDocs(adminDb.collection("products").where("inStock", "==", false)),
+    countDocs(adminDb.collection("users")),
   ])
 
   const stats = [
-    { label: "Productos", value: productCount ?? 0, icon: Package, color: "text-blue-500" },
-    { label: "Categorías", value: categoryCount ?? 0, icon: Tags, color: "text-green-500" },
-    { label: "Sin stock", value: outOfStockCount ?? 0, icon: AlertTriangle, color: "text-yellow-500" },
-    { label: "Usuarios", value: userCount ?? 0, icon: Users, color: "text-purple-500" },
+    { label: "Productos", value: productCount, icon: Package, color: "text-blue-500" },
+    { label: "Categorías", value: categoryCount, icon: Tags, color: "text-green-500" },
+    { label: "Sin stock", value: outOfStockCount, icon: AlertTriangle, color: "text-yellow-500" },
+    { label: "Usuarios", value: userCount, icon: Users, color: "text-purple-500" },
   ]
 
   return (

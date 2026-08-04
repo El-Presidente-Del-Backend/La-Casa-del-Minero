@@ -3,26 +3,49 @@ runConfig:
   maxInstances: 4
   concurrency: 80
 
+# El Admin SDK toma sus credenciales de la cuenta de servicio del backend
+# (Application Default Credentials), así que no hay ningún secreto que declarar.
 env:
-  # Públicas — expuestas al navegador por diseño (NEXT_PUBLIC_)
-  - variable: NEXT_PUBLIC_SUPABASE_URL
-    value: https://pybxheleybnzxwbgregh.supabase.co
+  # Configuración pública de Firebase — expuesta al navegador por diseño.
+  # Se necesita en BUILD (queda en el bundle del cliente) y en RUNTIME
+  # (el Admin SDK lee el projectId y el bucket).
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyBmZ845hnUg6BsFGZZsx2bnAJZS9kULWeo
     availability:
       - BUILD
+      - RUNTIME
 
-  - variable: NEXT_PUBLIC_SUPABASE_ANON_KEY
-    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5YnhoZWxleWJuenh3YmdyZWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDI5MDAsImV4cCI6MjA5MDAxODkwMH0.ZR1xCJMMZaCimVnx-NU983yW7JLQY9ACLD4nSbBSuh0
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: la-casa-del-minero.firebaseapp.com
     availability:
       - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: la-casa-del-minero
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: la-casa-del-minero.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "890125381246"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:890125381246:web:1fac1139426833f4e4322f
+    availability:
+      - BUILD
+      - RUNTIME
 
   - variable: NEXT_PUBLIC_WHATSAPP_NUMBER
     value: "56964141800"
     availability:
       - BUILD
-
-  # Secreta — solo disponible en el servidor, nunca llega al navegador
-  - variable: SUPABASE_SERVICE_ROLE_KEY
-    secret: SUPABASE_SERVICE_ROLE_KEY
-    availability:
-      - RUNTIME
-

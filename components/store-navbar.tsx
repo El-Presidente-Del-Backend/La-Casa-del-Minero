@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input"
 import type { CategoryRecord } from "@/lib/products"
 import { useUser } from "@/hooks/use-user"
 import { useCart } from "@/lib/cart/cart-context"
-import { createClient } from "@/lib/supabase/client"
+import { signOut } from "firebase/auth"
+import { getFirebaseAuth } from "@/lib/firebase/client"
+import { destroyServerSession } from "@/lib/firebase/auth-client"
 
 export function StoreNavbar({
   categories,
@@ -31,8 +33,8 @@ export function StoreNavbar({
   const { totalItems, setIsOpen: setCartOpen } = useCart()
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut(getFirebaseAuth())
+    await destroyServerSession()
     router.refresh()
   }
 

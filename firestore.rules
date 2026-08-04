@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Toda la lectura y escritura de datos de la aplicación pasa por el servidor con
+// el Admin SDK, que no está sujeto a estas reglas. Por eso aquí solo se define
+// lo que puede hacer un cliente directamente contra Firestore: leer el catálogo
+// público y nada más.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Datos personales: nunca accesibles desde el navegador.
+    match /users/{userId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,21 +1,24 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { adminDb } from "@/lib/firebase/admin"
+import { getCategoryOptions } from "@/lib/admin-queries"
 import { updateProduct } from "@/app/actions/admin"
 import { ProductForm } from "../../product-form"
 
 export default async function EditarProducto({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
 
-  const [{ data: product }, { data: categories }, { data: specs }] = await Promise.all([
-    supabase.from("products").select("*").eq("id", id).single(),
-    supabase.from("categories").select("id, name").order("name"),
-    supabase.from("product_specs").select("label, value").eq("product_id", id),
+  // Las especificaciones viajan dentro del propio documento, así que ya no hace
+  // falta la tercera consulta a product_specs.
+  const [snapshot, categories] = await Promise.all([
+    adminDb.collection("products").doc(id).get(),
+    getCategoryOptions(),
   ])
 
-  if (!product) notFound()
+  if (!snapshot.exists) notFound()
+
+  const product = snapshot.data()!
 
   const updateWithId = updateProduct.bind(null, id)
 
@@ -28,19 +31,19 @@ export default async function EditarProducto({ params }: { params: Promise<{ id:
         Editar: {product.name}
       </h1>
       <ProductForm
-        categories={categories ?? []}
+        categories={categories}
         defaultValues={{
           name: product.name,
           description: product.description,
-          long_description: product.long_description,
+          long_description: product.longDescription,
           price: product.price,
-          original_price: product.original_price,
-          category_id: product.category_id,
-          image_url: product.image_url,
+          original_price: product.originalPrice,
+          category_id: product.categoryId,
+          image_url: product.imageUrl,
           badge: product.badge,
-          in_stock: product.in_stock,
+          in_stock: product.inStock,
           sku: product.sku,
-          specs: specs ?? [],
+          specs: product.specs ?? [],
         }}
         action={updateWithId}
         submitLabel="Guardar Cambios"
