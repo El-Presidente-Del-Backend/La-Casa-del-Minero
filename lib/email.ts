@@ -14,7 +14,7 @@ function getResendClient(): Resend | null {
   return new Resend(apiKey)
 }
 
-type NotifiableStatus = "confirmado" | "enviado"
+type NotifiableStatus = "confirmado" | "enviado" | "entregado"
 
 type OrderStatusEmailInput = {
   to: string
@@ -35,6 +35,11 @@ const STATUS_COPY: Record<NotifiableStatus, { subject: string; heading: string; 
     subject: "Tu pedido fue enviado",
     heading: "¡Tu pedido está en camino!",
     message: "Tu pedido ya salió de nuestras bodegas.",
+  },
+  entregado: {
+    subject: "Tu pedido fue entregado",
+    heading: "¡Tu pedido fue entregado!",
+    message: "Confirmamos la entrega de tu pedido. ¡Gracias por comprar en La Casa del Minero!",
   },
 }
 

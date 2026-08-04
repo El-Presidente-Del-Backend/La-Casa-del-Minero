@@ -293,7 +293,7 @@ export async function deleteCategory(
 // Pedidos
 // ---------------------------------------------------------------------------
 
-const NOTIFIABLE_STATUSES = new Set(["confirmado", "enviado"])
+const NOTIFIABLE_STATUSES = new Set(["confirmado", "enviado", "entregado"])
 
 export async function updateOrderStatus(
   id: string,
@@ -337,7 +337,7 @@ export async function updateOrderStatus(
           customerName: (order.customerName as string) || "Cliente",
           items: (order.items as OrderItem[]) ?? [],
           total: (order.total as number) ?? 0,
-          status: newStatus as "confirmado" | "enviado",
+          status: newStatus as "confirmado" | "enviado" | "entregado",
           orderId: id,
         })
       } catch (err) {
