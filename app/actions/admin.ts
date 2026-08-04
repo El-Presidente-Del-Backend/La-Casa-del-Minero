@@ -2,59 +2,41 @@
 
 import { FieldValue } from "firebase-admin/firestore"
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { adminDb } from "@/lib/firebase/admin"
 import { requireAdmin } from "@/lib/firebase/session"
 import { PLACEHOLDER_IMAGE } from "@/lib/products"
-
-type Spec = { label: string; value: string }
+import { type ActionState, failState, okState } from "@/lib/action-state"
+import { slugify } from "@/lib/validations/form"
+import { productFormToRaw, productSchema, type ProductInput } from "@/lib/validations/product"
+import { categoryFormToRaw, categorySchema } from "@/lib/validations/category"
 
 // ---------------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------------
 
-function parseSpecs(formData: FormData): Spec[] {
-  const labels = formData.getAll("spec_label") as string[]
-  const values = formData.getAll("spec_value") as string[]
-
-  const specs: Spec[] = []
-  labels.forEach((label, i) => {
-    if (label && values[i]) specs.push({ label, value: values[i] })
-  })
-  return specs
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-}
-
 /**
  * Firestore no tiene restricciones UNIQUE como las que aplicaba Postgres sobre
  * `products.sku` y `categories.name`, así que se comprueban a mano.
  */
-async function assertFieldIsFree(
+async function findFieldClash(
   collection: string,
   field: string,
   value: string,
   exceptId?: string
-) {
+): Promise<boolean> {
   const snapshot = await adminDb.collection(collection).where(field, "==", value).get()
-  const clash = snapshot.docs.some((doc) => doc.id !== exceptId)
-  if (clash) throw new Error(`Ya existe un registro con ${field} "${value}"`)
+  return snapshot.docs.some((doc) => doc.id !== exceptId)
 }
 
 /**
  * El nombre de la categoría se guarda dentro de cada producto para evitar una
  * lectura extra por producto al pintar la tienda (Firestore no hace joins).
+ * Devuelve null cuando la categoría no existe, en vez de lanzar, para que la
+ * acción pueda mapearlo a un error de campo.
  */
-async function resolveCategoryName(categoryId: string): Promise<string> {
+async function resolveCategoryName(categoryId: string): Promise<string | null> {
   const doc = await adminDb.collection("categories").doc(categoryId).get()
-  if (!doc.exists) throw new Error("La categoría seleccionada no existe")
+  if (!doc.exists) return null
   return (doc.data()?.name as string | undefined) ?? ""
 }
 
@@ -71,23 +53,28 @@ async function updateInBatches(
   }
 }
 
-function productFromForm(formData: FormData, categoryName: string) {
-  const originalPrice = formData.get("original_price") as string
-
+function productToFirestore(data: ProductInput, categoryName: string) {
   return {
-    name: formData.get("name") as string,
-    description: formData.get("description") as string,
-    longDescription: (formData.get("long_description") as string) ?? "",
-    price: parseFloat(formData.get("price") as string),
-    originalPrice: originalPrice ? parseFloat(originalPrice) : null,
-    categoryId: formData.get("category_id") as string,
+    name: data.name,
+    description: data.description,
+    longDescription: data.long_description,
+    price: data.price,
+    originalPrice: data.original_price,
+    categoryId: data.category_id,
     categoryName,
-    imageUrl: (formData.get("image_url") as string) || PLACEHOLDER_IMAGE,
-    badge: (formData.get("badge") as string) || null,
-    inStock: formData.get("in_stock") === "on",
-    sku: formData.get("sku") as string,
-    specs: parseSpecs(formData),
+    imageUrl: data.image_url || PLACEHOLDER_IMAGE,
+    badge: data.badge,
+    inStock: data.in_stock,
+    sku: data.sku,
+    specs: data.specs,
   }
+}
+
+/** El dashboard también debe verse fresco tras cualquier mutación de productos o categorías. */
+function revalidateAdmin() {
+  revalidatePath("/admin")
+  revalidatePath("/admin/productos")
+  revalidatePath("/admin/categorias")
 }
 
 function revalidateStore() {
@@ -95,119 +82,206 @@ function revalidateStore() {
   revalidatePath("/tienda/[id]", "page")
 }
 
+function toFailState(err: unknown): ActionState {
+  return failState(err instanceof Error ? err.message : "Ocurrió un error inesperado")
+}
+
 // ---------------------------------------------------------------------------
 // Productos
 // ---------------------------------------------------------------------------
 
-export async function createProduct(formData: FormData) {
-  await requireAdmin()
+export async function createProduct(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
 
-  const sku = formData.get("sku") as string
-  await assertFieldIsFree("products", "sku", sku)
+    const parsed = productSchema.safeParse(productFormToRaw(formData))
+    if (!parsed.success) {
+      return failState("Revisa los campos marcados", parsed.error.flatten().fieldErrors)
+    }
+    const data = parsed.data
 
-  const categoryName = await resolveCategoryName(formData.get("category_id") as string)
+    if (await findFieldClash("products", "sku", data.sku)) {
+      return failState(`Ya existe un producto con el SKU "${data.sku}"`, {
+        sku: ["Ya existe un producto con este SKU"],
+      })
+    }
 
-  await adminDb.collection("products").add({
-    ...productFromForm(formData, categoryName),
-    createdAt: FieldValue.serverTimestamp(),
-  })
+    const categoryName = await resolveCategoryName(data.category_id)
+    if (categoryName === null) {
+      return failState("La categoría seleccionada no existe", {
+        category_id: ["Selecciona una categoría válida"],
+      })
+    }
 
-  revalidatePath("/admin/productos")
-  revalidateStore()
-  redirect("/admin/productos")
+    await adminDb.collection("products").add({
+      ...productToFirestore(data, categoryName),
+      createdAt: FieldValue.serverTimestamp(),
+    })
+
+    revalidateAdmin()
+    revalidateStore()
+    return okState("Producto creado", "/admin/productos")
+  } catch (err) {
+    return toFailState(err)
+  }
 }
 
-export async function updateProduct(id: string, formData: FormData) {
-  await requireAdmin()
+export async function updateProduct(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
 
-  const sku = formData.get("sku") as string
-  await assertFieldIsFree("products", "sku", sku, id)
+    const parsed = productSchema.safeParse(productFormToRaw(formData))
+    if (!parsed.success) {
+      return failState("Revisa los campos marcados", parsed.error.flatten().fieldErrors)
+    }
+    const data = parsed.data
 
-  const categoryName = await resolveCategoryName(formData.get("category_id") as string)
+    if (await findFieldClash("products", "sku", data.sku, id)) {
+      return failState(`Ya existe un producto con el SKU "${data.sku}"`, {
+        sku: ["Ya existe un producto con este SKU"],
+      })
+    }
 
-  // Las especificaciones viven dentro del documento, así que reemplazar el array
-  // sustituye al delete + insert sobre product_specs que hacía la versión SQL.
-  await adminDb
-    .collection("products")
-    .doc(id)
-    .update(productFromForm(formData, categoryName))
+    const categoryName = await resolveCategoryName(data.category_id)
+    if (categoryName === null) {
+      return failState("La categoría seleccionada no existe", {
+        category_id: ["Selecciona una categoría válida"],
+      })
+    }
 
-  revalidatePath("/admin/productos")
-  revalidateStore()
-  redirect("/admin/productos")
+    // Las especificaciones viven dentro del documento, así que reemplazar el array
+    // sustituye al delete + insert sobre product_specs que hacía la versión SQL.
+    await adminDb.collection("products").doc(id).update(productToFirestore(data, categoryName))
+
+    revalidateAdmin()
+    revalidateStore()
+    return okState("Cambios guardados", "/admin/productos")
+  } catch (err) {
+    return toFailState(err)
+  }
 }
 
-export async function deleteProduct(id: string) {
-  await requireAdmin()
+export async function deleteProduct(
+  id: string,
+  _prevState: ActionState,
+  _formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
 
-  await adminDb.collection("products").doc(id).delete()
+    await adminDb.collection("products").doc(id).delete()
 
-  revalidatePath("/admin/productos")
-  revalidateStore()
+    revalidateAdmin()
+    revalidateStore()
+    return okState("Producto eliminado")
+  } catch (err) {
+    return toFailState(err)
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Categorías
 // ---------------------------------------------------------------------------
 
-export async function createCategory(formData: FormData) {
-  await requireAdmin()
+export async function createCategory(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
 
-  const name = (formData.get("name") as string).trim()
-  const label = (formData.get("label") as string).trim()
-  const imageUrl = ((formData.get("image_url") as string) ?? "").trim() || null
+    const parsed = categorySchema.safeParse(categoryFormToRaw(formData))
+    if (!parsed.success) {
+      return failState("Revisa los campos marcados", parsed.error.flatten().fieldErrors)
+    }
+    const data = parsed.data
 
-  await assertFieldIsFree("categories", "name", name)
+    if (await findFieldClash("categories", "name", data.name)) {
+      return failState(`Ya existe una categoría con el nombre "${data.name}"`, {
+        name: ["Ya existe una categoría con este nombre"],
+      })
+    }
 
-  await adminDb.collection("categories").add({
-    name,
-    slug: slugify(name),
-    label,
-    imageUrl,
-    createdAt: FieldValue.serverTimestamp(),
-  })
+    await adminDb.collection("categories").add({
+      name: data.name,
+      slug: slugify(data.name),
+      label: data.label,
+      imageUrl: data.image_url || null,
+      createdAt: FieldValue.serverTimestamp(),
+    })
 
-  // Sin redirect: el formulario de categorías es inline, así que basta con
-  // revalidar para que el Server Component vuelva a pintar la tabla.
-  revalidatePath("/admin/categorias")
-  revalidateStore()
+    revalidateAdmin()
+    revalidateStore()
+    return okState("Categoría creada")
+  } catch (err) {
+    return toFailState(err)
+  }
 }
 
-export async function updateCategory(id: string, formData: FormData) {
-  await requireAdmin()
+export async function updateCategory(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
 
-  const name = (formData.get("name") as string).trim()
-  const label = (formData.get("label") as string).trim()
-  const imageUrl = ((formData.get("image_url") as string) ?? "").trim() || null
+    const parsed = categorySchema.safeParse(categoryFormToRaw(formData))
+    if (!parsed.success) {
+      return failState("Revisa los campos marcados", parsed.error.flatten().fieldErrors)
+    }
+    const data = parsed.data
 
-  await assertFieldIsFree("categories", "name", name, id)
+    if (await findFieldClash("categories", "name", data.name, id)) {
+      return failState(`Ya existe una categoría con el nombre "${data.name}"`, {
+        name: ["Ya existe una categoría con este nombre"],
+      })
+    }
 
-  await adminDb.collection("categories").doc(id).update({
-    name,
-    slug: slugify(name),
-    label,
-    imageUrl,
-  })
+    await adminDb.collection("categories").doc(id).update({
+      name: data.name,
+      slug: slugify(data.name),
+      label: data.label,
+      imageUrl: data.image_url || null,
+    })
 
-  // Al renombrar hay que propagar el nombre desnormalizado a sus productos.
-  const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
-  await updateInBatches(affected.docs, { categoryName: name })
+    // Al renombrar hay que propagar el nombre desnormalizado a sus productos.
+    const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
+    await updateInBatches(affected.docs, { categoryName: data.name })
 
-  revalidatePath("/admin/categorias")
-  revalidatePath("/admin/productos")
-  revalidateStore()
+    revalidateAdmin()
+    revalidateStore()
+    return okState("Categoría actualizada")
+  } catch (err) {
+    return toFailState(err)
+  }
 }
 
-export async function deleteCategory(id: string) {
-  await requireAdmin()
+export async function deleteCategory(
+  id: string,
+  _prevState: ActionState,
+  _formData: FormData
+): Promise<ActionState> {
+  try {
+    await requireAdmin()
 
-  // Equivalente al ON DELETE SET NULL que tenía la clave foránea en Postgres.
-  const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
-  await updateInBatches(affected.docs, { categoryId: null, categoryName: "" })
+    // Equivalente al ON DELETE SET NULL que tenía la clave foránea en Postgres.
+    const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
+    await updateInBatches(affected.docs, { categoryId: null, categoryName: "" })
 
-  await adminDb.collection("categories").doc(id).delete()
+    await adminDb.collection("categories").doc(id).delete()
 
-  revalidatePath("/admin/categorias")
-  revalidatePath("/admin/productos")
-  revalidateStore()
+    revalidateAdmin()
+    revalidateStore()
+    return okState("Categoría eliminada")
+  } catch (err) {
+    return toFailState(err)
+  }
 }

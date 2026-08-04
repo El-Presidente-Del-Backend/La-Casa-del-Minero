@@ -1,49 +1,25 @@
 import Link from "next/link"
-import Image from "next/image"
-import { Plus, Pencil } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { adminDb } from "@/lib/firebase/admin"
-import { PLACEHOLDER_IMAGE } from "@/lib/products"
-import { DeleteProductButton } from "./delete-button"
-
-type AdminProduct = {
-  id: string
-  name: string
-  sku: string
-  categoryName: string
-  price: number
-  imageUrl: string
-  badge: string | null
-  inStock: boolean
-  createdAt: number
-}
-
-async function getAdminProducts(): Promise<AdminProduct[]> {
-  const snapshot = await adminDb.collection("products").get()
-
-  // Se ordena en memoria por el mismo motivo que en lib/queries.ts: un producto
-  // sin `createdAt` quedaría fuera de una consulta con orderBy.
-  return snapshot.docs
-    .map((doc) => {
-      const data = doc.data()
-      return {
-        id: doc.id,
-        name: (data.name as string) ?? "",
-        sku: (data.sku as string) ?? "",
-        categoryName: (data.categoryName as string) || "—",
-        price: (data.price as number) ?? 0,
-        imageUrl: (data.imageUrl as string) || PLACEHOLDER_IMAGE,
-        badge: (data.badge as string | null) ?? null,
-        inStock: (data.inStock as boolean) ?? true,
-        createdAt: data.createdAt?.toMillis() ?? 0,
-      }
-    })
-    .sort((a, b) => b.createdAt - a.createdAt)
-}
+import { getAdminProducts, getCategoryOptions } from "@/lib/admin-queries"
+import { ProductsTable } from "./products-table"
 
 export default async function AdminProductos() {
-  const products = await getAdminProducts()
+  const [products, categories] = await Promise.all([getAdminProducts(), getCategoryOptions()])
+
+  // Proyección ligera: la tabla no necesita longDescription/description/specs,
+  // y evitar mandarlos al cliente mantiene el payload del listado pequeño.
+  const rows = products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    categoryId: p.categoryId,
+    categoryName: p.categoryName,
+    price: p.price,
+    imageUrl: p.imageUrl,
+    badge: p.badge,
+    inStock: p.inStock,
+  }))
 
   return (
     <div>
@@ -59,57 +35,7 @@ export default async function AdminProductos() {
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Producto</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">SKU</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categoría</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Precio</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stock</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((product) => (
-              <tr key={product.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                      <Image src={product.imageUrl} alt={product.name} fill className="object-cover" sizes="40px" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{product.name}</p>
-                      {product.badge && <Badge variant="secondary" className="mt-0.5 text-[10px]">{product.badge}</Badge>}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{product.sku}</td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">
-                  {product.categoryName}
-                </td>
-                <td className="px-4 py-3 text-right text-sm font-medium text-foreground">
-                  ${product.price.toLocaleString("es-CL")}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${product.inStock ? "bg-green-500" : "bg-red-500"}`} />
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-2">
-                    <Link href={`/admin/productos/${product.id}/editar`}>
-                      <Button variant="ghost" size="sm">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <DeleteProductButton id={product.id} name={product.name} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ProductsTable products={rows} categories={categories} />
     </div>
   )
 }

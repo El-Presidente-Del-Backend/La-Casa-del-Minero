@@ -1,24 +1,16 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import { adminDb } from "@/lib/firebase/admin"
-import { getCategoryOptions } from "@/lib/admin-queries"
+import { getAdminProductById, getCategoryOptions } from "@/lib/admin-queries"
 import { updateProduct } from "@/app/actions/admin"
 import { ProductForm } from "../../product-form"
 
 export default async function EditarProducto({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  // Las especificaciones viajan dentro del propio documento, así que ya no hace
-  // falta la tercera consulta a product_specs.
-  const [snapshot, categories] = await Promise.all([
-    adminDb.collection("products").doc(id).get(),
-    getCategoryOptions(),
-  ])
+  const [product, categories] = await Promise.all([getAdminProductById(id), getCategoryOptions()])
 
-  if (!snapshot.exists) notFound()
-
-  const product = snapshot.data()!
+  if (!product) notFound()
 
   const updateWithId = updateProduct.bind(null, id)
 
@@ -38,12 +30,12 @@ export default async function EditarProducto({ params }: { params: Promise<{ id:
           long_description: product.longDescription,
           price: product.price,
           original_price: product.originalPrice,
-          category_id: product.categoryId,
+          category_id: product.categoryId ?? "",
           image_url: product.imageUrl,
           badge: product.badge,
           in_stock: product.inStock,
           sku: product.sku,
-          specs: product.specs ?? [],
+          specs: product.specs,
         }}
         action={updateWithId}
         submitLabel="Guardar Cambios"
