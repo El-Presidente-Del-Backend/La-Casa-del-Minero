@@ -1,5 +1,5 @@
 import { getAdminOrders } from "@/lib/admin-queries"
-import { OrdersTable } from "./orders-table"
+import { OrdersKanban } from "./orders-kanban"
 
 export default async function AdminPedidos() {
   const orders = await getAdminOrders()
@@ -12,7 +12,7 @@ export default async function AdminPedidos() {
         </h1>
       </div>
 
-      <OrdersTable orders={orders} />
+      <OrdersKanban orders={orders} />
     </div>
   )
 }
