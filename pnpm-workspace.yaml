@@ -1,0 +1,7 @@
+# Ubicación canónica de la configuración de pnpm 10. El campo `pnpm` de
+# package.json no lo lee el runner de Cloud Build que usa App Hosting, y sin
+# esto el build falla con ERR_PNPM_IGNORED_BUILDS.
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - protobufjs
+  - sharp
