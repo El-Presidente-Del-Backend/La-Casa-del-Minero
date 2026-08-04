@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ImageUpload } from "@/components/admin/image-upload"
+import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { FieldError } from "@/components/admin/field-error"
 import { SubmitButton } from "@/components/admin/submit-button"
 import { idleState, type ActionState } from "@/lib/action-state"
@@ -31,7 +31,7 @@ type ProductData = {
   price?: number
   original_price?: number | null
   category_id?: string
-  image_url?: string
+  image_urls?: string[]
   badge?: string | null
   in_stock?: boolean
   sku?: string
@@ -168,12 +168,11 @@ export function ProductForm({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ImageUpload label="Imagen del producto" defaultValue={defaultValues?.image_url} folder="products" />
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="badge">Badge</Label>
-          <Input id="badge" name="badge" defaultValue={defaultValues?.badge ?? ""} placeholder="Ej: Nuevo, Oferta, Premium" />
-        </div>
+      <MultiImageUpload label="Imágenes del producto" defaultValue={defaultValues?.image_urls} folder="products" />
+
+      <div className="flex flex-col gap-2 sm:w-1/2">
+        <Label htmlFor="badge">Badge</Label>
+        <Input id="badge" name="badge" defaultValue={defaultValues?.badge ?? ""} placeholder="Ej: Nuevo, Oferta, Premium" />
       </div>
 
       <div className="flex items-center gap-2">

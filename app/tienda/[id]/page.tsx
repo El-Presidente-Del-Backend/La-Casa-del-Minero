@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation"
-import Image from "next/image"
 import Link from "next/link"
 import { Truck, ShieldCheck, RotateCcw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { getProductById, getRelatedProducts } from "@/lib/queries"
 import { ProductCard } from "@/components/product-card"
+import { ProductGallery } from "@/components/product-gallery"
 import { StoreFooter } from "@/components/store-footer"
 import { ProductDetailNavbar } from "@/components/product-detail-navbar"
 import { ProductActions } from "@/components/product-actions"
@@ -57,28 +57,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {/* Product detail */}
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Image */}
-          <div className="group relative aspect-square cursor-zoom-in overflow-hidden rounded-lg border border-border bg-card">
-            <Image
-              src={product.image}
-              alt={product.name}
-              fill
-              className="object-contain transition-transform duration-500 ease-out group-hover:scale-110"
-              priority
-              sizes="(max-width: 1024px) 100vw, 50vw"
-            />
-            {product.badge && (
-              <Badge className="absolute left-4 top-4 text-xs uppercase tracking-wider">
-                {product.badge}
-              </Badge>
-            )}
-            {!product.inStock && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-                <span className="rounded-md bg-secondary px-6 py-2 text-lg font-bold uppercase tracking-wide text-muted-foreground">
-                  Agotado
-                </span>
-              </div>
-            )}
-          </div>
+          <ProductGallery
+            images={product.images}
+            alt={product.name}
+            badge={product.badge}
+            inStock={product.inStock}
+          />
 
           {/* Info */}
           <div className="flex flex-col gap-5">

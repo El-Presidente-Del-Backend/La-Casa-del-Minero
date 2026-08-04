@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { adminDb } from '@/lib/firebase/admin'
-import { PLACEHOLDER_IMAGE } from '@/lib/products'
+import { PLACEHOLDER_IMAGE, resolveProductImages } from '@/lib/products'
 import type { CategoryRecord } from '@/lib/products'
 import type { OrderItem, OrderStatus } from '@/lib/orders'
 
@@ -52,7 +52,7 @@ export type AdminProduct = {
   originalPrice: number | null
   categoryId: string | null
   categoryName: string
-  imageUrl: string
+  images: string[]
   badge: string | null
   inStock: boolean
   sku: string
@@ -71,7 +71,7 @@ function toAdminProduct(id: string, data: FirebaseFirestore.DocumentData): Admin
     originalPrice: (data.originalPrice as number | null) ?? null,
     categoryId: (data.categoryId as string | null) ?? null,
     categoryName: (data.categoryName as string) || '',
-    imageUrl: (data.imageUrl as string) || PLACEHOLDER_IMAGE,
+    images: resolveProductImages(data.images as string[] | undefined, data.imageUrl as string | undefined),
     badge: (data.badge as string | null) ?? null,
     inStock: (data.inStock as boolean) ?? true,
     sku: (data.sku as string) ?? '',
@@ -249,7 +249,7 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
     alerts: {
       outOfStock: toAlertGroup(products.filter((p) => !p.inStock)),
       missingImage: toAlertGroup(
-        products.filter((p) => !p.imageUrl || p.imageUrl === PLACEHOLDER_IMAGE)
+        products.filter((p) => p.images.length === 0 || p.images[0] === PLACEHOLDER_IMAGE)
       ),
       missingCategory: toAlertGroup(products.filter((p) => !p.categoryId || !p.categoryName)),
       missingSpecs: toAlertGroup(products.filter((p) => p.specs.length === 0)),

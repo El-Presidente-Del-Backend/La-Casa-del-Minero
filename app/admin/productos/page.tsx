@@ -16,7 +16,7 @@ export default async function AdminProductos() {
     categoryId: p.categoryId,
     categoryName: p.categoryName,
     price: p.price,
-    imageUrl: p.imageUrl,
+    imageUrl: p.images[0],
     badge: p.badge,
     inStock: p.inStock,
   }))

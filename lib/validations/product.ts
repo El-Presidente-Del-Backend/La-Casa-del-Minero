@@ -1,6 +1,8 @@
 import { z } from "zod"
 import { checkbox, optionalNumber, optionalText, requiredNumber } from "./form"
 
+export const MAX_PRODUCT_IMAGES = 6
+
 export const specSchema = z.object({
   label: z.string().trim().min(1, "La etiqueta no puede estar vacía"),
   value: z.string().trim().min(1, "El valor no puede estar vacío"),
@@ -15,7 +17,10 @@ export const productSchema = z
     price: requiredNumber("El precio debe ser un número válido"),
     original_price: optionalNumber(),
     category_id: z.string().trim().min(1, "Selecciona una categoría"),
-    image_url: z.string().trim().default(""),
+    image_urls: z
+      .array(z.string().trim().min(1))
+      .max(MAX_PRODUCT_IMAGES, `Máximo ${MAX_PRODUCT_IMAGES} imágenes`)
+      .default([]),
     badge: optionalText,
     in_stock: checkbox,
     specs: z.array(specSchema).default([]),
@@ -48,7 +53,7 @@ export function productFormToRaw(formData: FormData): unknown {
     price: formData.get("price"),
     original_price: formData.get("original_price"),
     category_id: formData.get("category_id"),
-    image_url: formData.get("image_url") ?? "",
+    image_urls: formData.getAll("image_urls"),
     badge: formData.get("badge"),
     in_stock: formData.get("in_stock"),
     specs,

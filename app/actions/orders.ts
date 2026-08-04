@@ -4,7 +4,7 @@ import { FieldValue } from "firebase-admin/firestore"
 import { revalidatePath } from "next/cache"
 import { adminDb } from "@/lib/firebase/admin"
 import { getCurrentUser } from "@/lib/firebase/session"
-import { PLACEHOLDER_IMAGE } from "@/lib/products"
+import { resolveProductImages } from "@/lib/products"
 import type { OrderItem } from "@/lib/orders"
 import { createOrderSchema } from "@/lib/validations/order"
 
@@ -50,7 +50,7 @@ export async function createOrder(input: {
         name: (p.name as string) ?? "",
         price: (p.price as number) ?? 0,
         quantity: data.items[idx].quantity,
-        image: (p.imageUrl as string) || PLACEHOLDER_IMAGE,
+        image: resolveProductImages(p.images as string[] | undefined, p.imageUrl as string | undefined)[0],
       })
     })
 
