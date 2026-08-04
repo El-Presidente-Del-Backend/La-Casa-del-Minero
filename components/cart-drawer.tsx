@@ -165,7 +165,7 @@ export function CartDrawer() {
                     {/* Image */}
                     <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted">
                       <Image
-                        src={item.product.image}
+                        src={item.product.images[0]}
                         alt={item.product.name}
                         fill
                         className="object-cover"

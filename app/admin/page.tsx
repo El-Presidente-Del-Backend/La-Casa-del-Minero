@@ -228,7 +228,7 @@ export default async function AdminDashboard() {
                       className="flex items-center gap-3 rounded-md p-2 hover:bg-muted"
                     >
                       <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                        <Image src={p.imageUrl} alt={p.name} fill className="object-cover" sizes="40px" />
+                        <Image src={p.images[0]} alt={p.name} fill className="object-cover" sizes="40px" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">{p.name}</p>

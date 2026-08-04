@@ -31,7 +31,7 @@ export default async function EditarProducto({ params }: { params: Promise<{ id:
           price: product.price,
           original_price: product.originalPrice,
           category_id: product.categoryId ?? "",
-          image_url: product.imageUrl,
+          image_urls: product.images,
           badge: product.badge,
           in_stock: product.inStock,
           sku: product.sku,

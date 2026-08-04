@@ -63,7 +63,7 @@ function productToFirestore(data: ProductInput, categoryName: string) {
     originalPrice: data.original_price,
     categoryId: data.category_id,
     categoryName,
-    imageUrl: data.image_url || PLACEHOLDER_IMAGE,
+    images: data.image_urls.length > 0 ? data.image_urls : [PLACEHOLDER_IMAGE],
     badge: data.badge,
     inStock: data.in_stock,
     sku: data.sku,

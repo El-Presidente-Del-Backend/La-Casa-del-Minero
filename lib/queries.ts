@@ -1,6 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { adminDb } from '@/lib/firebase/admin'
-import { PLACEHOLDER_IMAGE, type CategoryRecord, type Product } from '@/lib/products'
+import { resolveProductImages, type CategoryRecord, type Product } from '@/lib/products'
 
 // ---------------------------------------------------------------------------
 // Documento de Firestore → Product
@@ -14,6 +14,8 @@ interface ProductDoc {
   originalPrice?: number | null
   categoryId?: string | null
   categoryName?: string
+  images?: string[]
+  /** Legacy: productos creados antes de soportar múltiples imágenes. */
   imageUrl?: string
   badge?: string | null
   inStock?: boolean
@@ -38,7 +40,7 @@ function toProduct(id: string, doc: ProductDoc): Product {
     price: doc.price ?? 0,
     ...(doc.originalPrice != null ? { originalPrice: doc.originalPrice } : {}),
     category: doc.categoryName ?? '',
-    image: doc.imageUrl || PLACEHOLDER_IMAGE,
+    images: resolveProductImages(doc.images, doc.imageUrl),
     ...(doc.badge ? { badge: doc.badge } : {}),
     inStock: doc.inStock ?? true,
     sku: doc.sku ?? '',
