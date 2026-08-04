@@ -4,7 +4,9 @@ runConfig:
   concurrency: 80
 
 # El Admin SDK toma sus credenciales de la cuenta de servicio del backend
-# (Application Default Credentials), así que no hay ningún secreto que declarar.
+# (Application Default Credentials). El único secreto real es RESEND_API_KEY,
+# creado con `firebase apphosting:secrets:set RESEND_API_KEY` y referenciado
+# más abajo — nunca como `value:` en texto plano.
 env:
   # Configuración pública de Firebase — expuesta al navegador por diseño.
   # Se necesita en BUILD (queda en el bundle del cliente) y en RUNTIME
@@ -49,3 +51,21 @@ env:
     value: "56964141800"
     availability:
       - BUILD
+
+  # Remitente de los correos de estado de pedido (lib/email.ts). No es
+  # sensible, por eso va como value: normal en vez de secreto.
+  - variable: SALES_EMAIL_FROM
+    value: pedido@lacasadelminero.cl
+    availability:
+      - RUNTIME
+
+  # API key de Resend (resend.com) para el envío de correos transaccionales.
+  # Créala con:
+  #   firebase apphosting:secrets:set RESEND_API_KEY --project la-casa-del-minero
+  #   firebase apphosting:secrets:grantaccess RESEND_API_KEY --backend=claudss-casadelminero --project la-casa-del-minero
+  # Mientras no exista, lib/email.ts detecta la ausencia y solo deja un log,
+  # sin romper el cambio de estado del pedido.
+  - variable: RESEND_API_KEY
+    secret: RESEND_API_KEY
+    availability:
+      - RUNTIME

@@ -19,6 +19,7 @@ export function CartDrawer() {
 
   const [step, setStep] = useState<"cart" | "contact">("cart")
   const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,7 +43,7 @@ export function CartDrawer() {
     return encodeURIComponent(msg)
   }
 
-  const submitOrder = async (contact?: { name: string; phone: string }) => {
+  const submitOrder = async (contact?: { name: string; email: string; phone: string }) => {
     // La ventana se abre síncronamente, antes de cualquier await: si se abre
     // después de esperar la respuesta del servidor, Safari/Chrome suelen
     // bloquearla por no reconocerla ya como parte directa del clic.
@@ -53,6 +54,7 @@ export function CartDrawer() {
     const result = await createOrder({
       items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
       name: contact?.name,
+      email: contact?.email,
       phone: contact?.phone,
     })
 
@@ -84,11 +86,11 @@ export function CartDrawer() {
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !phone.trim()) {
-      setError("Ingresa tu nombre y teléfono para continuar")
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      setError("Ingresa tu nombre, email y teléfono para continuar")
       return
     }
-    void submitOrder({ name: name.trim(), phone: phone.trim() })
+    void submitOrder({ name: name.trim(), email: email.trim(), phone: phone.trim() })
   }
 
   return (
@@ -129,6 +131,17 @@ export function CartDrawer() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Tu nombre"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="contact-email">Email</Label>
+                <Input
+                  id="contact-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
                   required
                 />
               </div>
