@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, ShoppingCart, User, LogOut } from "lucide-react"
+import { ArrowLeft, ShoppingCart, User, LogOut, LayoutDashboard } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
 import { useCart } from "@/lib/cart/cart-context"
 import { signOut } from "firebase/auth"
@@ -12,7 +12,7 @@ import { destroyServerSession } from "@/lib/firebase/auth-client"
 
 export function ProductDetailNavbar() {
   const router = useRouter()
-  const { user, loading } = useUser()
+  const { user, isAdmin, loading } = useUser()
   const { totalItems, setIsOpen: setCartOpen } = useCart()
 
   const handleLogout = async () => {
@@ -38,6 +38,15 @@ export function ProductDetailNavbar() {
             ) : user ? (
               <div className="flex items-center gap-3">
                 <span className="hidden text-xs text-muted-foreground sm:inline">{user.email}</span>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Panel admin</span>
+                  </Link>
+                )}
                 <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
                   <LogOut className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Salir</span>
