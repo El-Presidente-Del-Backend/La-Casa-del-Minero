@@ -31,16 +31,37 @@ async function findFieldClash(
   return snapshot.docs.some((doc) => doc.id !== exceptId)
 }
 
+async function hasChildCategories(id: string): Promise<boolean> {
+  const snapshot = await adminDb.collection("categories").where("parentId", "==", id).limit(1).get()
+  return !snapshot.empty
+}
+
+type CategoryContext =
+  | { ok: true; name: string; parentId: string | null; parentName: string }
+  | { ok: false; reason: "not_found" | "has_children" }
+
 /**
- * El nombre de la categoría se guarda dentro de cada producto para evitar una
- * lectura extra por producto al pintar la tienda (Firestore no hace joins).
- * Devuelve null cuando la categoría no existe, en vez de lanzar, para que la
- * acción pueda mapearlo a un error de campo.
+ * El nombre de la categoría (y de su padre, si tiene) se guarda dentro de cada
+ * producto para evitar una lectura extra al pintar la tienda (Firestore no
+ * hace joins). Un producto solo puede asignarse al nivel más específico: si
+ * la categoría elegida ya tiene subcategorías, se rechaza en vez de dejarlo
+ * "suelto" en el padre.
  */
-async function resolveCategoryName(categoryId: string): Promise<string | null> {
+async function resolveCategoryContext(categoryId: string): Promise<CategoryContext> {
   const doc = await adminDb.collection("categories").doc(categoryId).get()
-  if (!doc.exists) return null
-  return (doc.data()?.name as string | undefined) ?? ""
+  if (!doc.exists) return { ok: false, reason: "not_found" }
+
+  if (await hasChildCategories(categoryId)) return { ok: false, reason: "has_children" }
+
+  const data = doc.data()!
+  const parentId = (data.parentId as string | null) ?? null
+  let parentName = ""
+  if (parentId) {
+    const parentDoc = await adminDb.collection("categories").doc(parentId).get()
+    parentName = (parentDoc.data()?.name as string | undefined) ?? ""
+  }
+
+  return { ok: true, name: (data.name as string | undefined) ?? "", parentId, parentName }
 }
 
 /** Aplica una escritura a muchos documentos respetando el límite de 500 por lote. */
@@ -56,7 +77,10 @@ async function updateInBatches(
   }
 }
 
-function productToFirestore(data: ProductInput, categoryName: string) {
+function productToFirestore(
+  data: ProductInput,
+  ctx: { name: string; parentId: string | null; parentName: string }
+) {
   return {
     name: data.name,
     description: data.description,
@@ -64,7 +88,9 @@ function productToFirestore(data: ProductInput, categoryName: string) {
     price: data.price,
     originalPrice: data.original_price,
     categoryId: data.category_id,
-    categoryName,
+    categoryName: ctx.name,
+    parentCategoryId: ctx.parentId,
+    parentCategoryName: ctx.parentName,
     images: data.image_urls.length > 0 ? data.image_urls : [PLACEHOLDER_IMAGE],
     badge: data.badge,
     inStock: data.in_stock,
@@ -112,15 +138,18 @@ export async function createProduct(
       })
     }
 
-    const categoryName = await resolveCategoryName(data.category_id)
-    if (categoryName === null) {
-      return failState("La categoría seleccionada no existe", {
-        category_id: ["Selecciona una categoría válida"],
-      })
+    const categoryCtx = await resolveCategoryContext(data.category_id)
+    if (!categoryCtx.ok) {
+      return failState(
+        categoryCtx.reason === "has_children"
+          ? "Esta categoría tiene subcategorías; selecciona una de ellas"
+          : "La categoría seleccionada no existe",
+        { category_id: ["Selecciona una categoría válida"] }
+      )
     }
 
     await adminDb.collection("products").add({
-      ...productToFirestore(data, categoryName),
+      ...productToFirestore(data, categoryCtx),
       createdAt: FieldValue.serverTimestamp(),
     })
 
@@ -152,16 +181,19 @@ export async function updateProduct(
       })
     }
 
-    const categoryName = await resolveCategoryName(data.category_id)
-    if (categoryName === null) {
-      return failState("La categoría seleccionada no existe", {
-        category_id: ["Selecciona una categoría válida"],
-      })
+    const categoryCtx = await resolveCategoryContext(data.category_id)
+    if (!categoryCtx.ok) {
+      return failState(
+        categoryCtx.reason === "has_children"
+          ? "Esta categoría tiene subcategorías; selecciona una de ellas"
+          : "La categoría seleccionada no existe",
+        { category_id: ["Selecciona una categoría válida"] }
+      )
     }
 
     // Las especificaciones viven dentro del documento, así que reemplazar el array
     // sustituye al delete + insert sobre product_specs que hacía la versión SQL.
-    await adminDb.collection("products").doc(id).update(productToFirestore(data, categoryName))
+    await adminDb.collection("products").doc(id).update(productToFirestore(data, categoryCtx))
 
     revalidateAdmin()
     revalidateStore()
@@ -212,11 +244,26 @@ export async function createCategory(
       })
     }
 
+    if (data.parent_id) {
+      const parentDoc = await adminDb.collection("categories").doc(data.parent_id).get()
+      if (!parentDoc.exists) {
+        return failState("La categoría padre seleccionada no existe", {
+          parent_id: ["Selecciona una categoría padre válida"],
+        })
+      }
+      if ((parentDoc.data()?.parentId as string | null | undefined) != null) {
+        return failState("La categoría padre no puede ser a su vez una subcategoría", {
+          parent_id: ["No se permiten más de 2 niveles"],
+        })
+      }
+    }
+
     await adminDb.collection("categories").add({
       name: data.name,
       slug: slugify(data.name),
       label: data.label,
       imageUrl: data.image_url || null,
+      parentId: data.parent_id ?? null,
       createdAt: FieldValue.serverTimestamp(),
     })
 
@@ -248,16 +295,51 @@ export async function updateCategory(
       })
     }
 
+    if (data.parent_id === id) {
+      return failState("Una categoría no puede ser su propia categoría padre", {
+        parent_id: ["Selecciona una categoría padre distinta"],
+      })
+    }
+
+    let parentName = ""
+    if (data.parent_id) {
+      const parentDoc = await adminDb.collection("categories").doc(data.parent_id).get()
+      if (!parentDoc.exists) {
+        return failState("La categoría padre seleccionada no existe", {
+          parent_id: ["Selecciona una categoría padre válida"],
+        })
+      }
+      if ((parentDoc.data()?.parentId as string | null | undefined) != null) {
+        return failState("La categoría padre no puede ser a su vez una subcategoría", {
+          parent_id: ["No se permiten más de 2 niveles"],
+        })
+      }
+      if (await hasChildCategories(id)) {
+        return failState("Esta categoría tiene subcategorías; no puede convertirse en subcategoría de otra", {
+          parent_id: ["Debe permanecer como categoría principal"],
+        })
+      }
+      parentName = (parentDoc.data()?.name as string | undefined) ?? ""
+    }
+
     await adminDb.collection("categories").doc(id).update({
       name: data.name,
       slug: slugify(data.name),
       label: data.label,
       imageUrl: data.image_url || null,
+      parentId: data.parent_id ?? null,
     })
 
-    // Al renombrar hay que propagar el nombre desnormalizado a sus productos.
-    const affected = await adminDb.collection("products").where("categoryId", "==", id).get()
-    await updateInBatches(affected.docs, { categoryName: data.name })
+    // Al renombrar o re-parentar hay que propagar lo desnormalizado a sus productos...
+    const direct = await adminDb.collection("products").where("categoryId", "==", id).get()
+    await updateInBatches(direct.docs, {
+      categoryName: data.name,
+      parentCategoryId: data.parent_id ?? null,
+      parentCategoryName: parentName,
+    })
+    // ...y si esta categoría es a su vez un padre, también a los productos de sus subcategorías.
+    const grandchildren = await adminDb.collection("products").where("parentCategoryId", "==", id).get()
+    await updateInBatches(grandchildren.docs, { parentCategoryName: data.name })
 
     revalidateAdmin()
     revalidateStore()
@@ -274,6 +356,12 @@ export async function deleteCategory(
 ): Promise<ActionState> {
   try {
     await requireAdmin()
+
+    if (await hasChildCategories(id)) {
+      return failState(
+        "No se puede eliminar: esta categoría tiene subcategorías. Elimínalas o reasígnalas primero."
+      )
+    }
 
     // Equivalente al ON DELETE SET NULL que tenía la clave foránea en Postgres.
     const affected = await adminDb.collection("products").where("categoryId", "==", id).get()

@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Search, ShoppingCart, User, Menu, X, ArrowLeft, LogOut, LayoutDashboard } from "lucide-react"
+import { Search, ShoppingCart, User, Menu, X, ArrowLeft, LogOut, LayoutDashboard, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { CategoryRecord } from "@/lib/products"
+import { buildCategoryTree } from "@/lib/categories"
 import { useUser } from "@/hooks/use-user"
 import { useCart } from "@/lib/cart/cart-context"
 import { signOut } from "firebase/auth"
@@ -16,18 +17,20 @@ import { destroyServerSession } from "@/lib/firebase/auth-client"
 
 export function StoreNavbar({
   categories,
-  activeCategory,
+  activeCategoryId,
   onCategoryChange,
   onSearch,
 }: {
   categories: CategoryRecord[]
-  activeCategory?: string
-  onCategoryChange?: (cat: string) => void
+  activeCategoryId?: string
+  onCategoryChange?: (id: string) => void
   onSearch?: (query: string) => void
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [openParentId, setOpenParentId] = useState<string | null>(null)
+  const [expandedMobile, setExpandedMobile] = useState<Set<string>>(new Set())
   const router = useRouter()
   const { user, isAdmin, loading } = useUser()
   const { totalItems, setIsOpen: setCartOpen } = useCart()
@@ -43,7 +46,17 @@ export function StoreNavbar({
     onSearch?.(searchQuery)
   }
 
-  const allCategories = [{ id: "todos", name: "Todos", slug: "todos", label: "Todos", image_url: null }, ...categories]
+  const categoryTree = useMemo(() => buildCategoryTree(categories), [categories])
+  const openParent = categoryTree.find((c) => c.id === openParentId)
+
+  const toggleMobileExpanded = (id: string) => {
+    setExpandedMobile((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card">
@@ -149,44 +162,128 @@ export function StoreNavbar({
       {/* Category navigation - desktop */}
       <nav className="hidden border-t border-border/60 bg-primary md:block">
         <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-4">
-          {allCategories.map((cat) => (
+          <button
+            onClick={() => {
+              onCategoryChange?.("todos")
+              router.push("/tienda")
+            }}
+            className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+              activeCategoryId === "todos"
+                ? "bg-primary-foreground/20 text-primary-foreground"
+                : "text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            }`}
+          >
+            Todos
+          </button>
+          {categoryTree.map((cat) => (
             <button
               key={cat.id}
               onClick={() => {
-                onCategoryChange?.(cat.name)
+                onCategoryChange?.(cat.id)
                 router.push("/tienda")
+                setOpenParentId((prev) => (cat.children.length > 0 ? (prev === cat.id ? null : cat.id) : null))
               }}
-              className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                activeCategory === cat.name
+              className={`flex shrink-0 items-center gap-1 whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                activeCategoryId === cat.id
                   ? "bg-primary-foreground/20 text-primary-foreground"
                   : "text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
               }`}
             >
               {cat.label}
+              {cat.children.length > 0 && (
+                <ChevronDown className={`h-3 w-3 transition-transform ${openParentId === cat.id ? "rotate-180" : ""}`} />
+              )}
             </button>
           ))}
         </div>
+
+        {/* Subcategorías del padre abierto — fuera del contenedor con scroll
+            horizontal para no quedar recortadas por su overflow. */}
+        {openParent && openParent.children.length > 0 && (
+          <div className="border-t border-primary-foreground/10 bg-primary/95">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-4 py-2">
+              {openParent.children.map((child) => (
+                <button
+                  key={child.id}
+                  onClick={() => {
+                    onCategoryChange?.(child.id)
+                    router.push("/tienda")
+                    setOpenParentId(null)
+                  }}
+                  className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                    activeCategoryId === child.id
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  }`}
+                >
+                  {child.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Mobile menu */}
       {mobileOpen && (
         <nav className="border-t border-border md:hidden">
           <div className="flex flex-col px-4 py-3">
-            {allCategories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => {
-                  onCategoryChange?.(cat.name)
-                  setMobileOpen(false)
-                }}
-                className={`px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                  activeCategory === cat.name
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {cat.label}
-              </button>
+            <button
+              onClick={() => {
+                onCategoryChange?.("todos")
+                setMobileOpen(false)
+              }}
+              className={`px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                activeCategoryId === "todos" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Todos
+            </button>
+            {categoryTree.map((cat) => (
+              <div key={cat.id}>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => {
+                      onCategoryChange?.(cat.id)
+                      setMobileOpen(false)
+                    }}
+                    className={`flex-1 px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                      activeCategoryId === cat.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                  {cat.children.length > 0 && (
+                    <button
+                      onClick={() => toggleMobileExpanded(cat.id)}
+                      aria-label={`Mostrar subcategorías de ${cat.label}`}
+                      className="p-2.5 text-muted-foreground"
+                    >
+                      <ChevronRight
+                        className={`h-4 w-4 transition-transform ${expandedMobile.has(cat.id) ? "rotate-90" : ""}`}
+                      />
+                    </button>
+                  )}
+                </div>
+                {cat.children.length > 0 && expandedMobile.has(cat.id) && (
+                  <div className="flex flex-col">
+                    {cat.children.map((child) => (
+                      <button
+                        key={child.id}
+                        onClick={() => {
+                          onCategoryChange?.(child.id)
+                          setMobileOpen(false)
+                        }}
+                        className={`px-3 py-2 pl-8 text-left text-sm transition-colors ${
+                          activeCategoryId === child.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {child.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </nav>

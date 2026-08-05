@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect, useRef, useState } from "react"
+import { useActionState, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Plus, X } from "lucide-react"
@@ -11,7 +11,9 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -19,8 +21,9 @@ import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { FieldError } from "@/components/admin/field-error"
 import { SubmitButton } from "@/components/admin/submit-button"
 import { idleState, type ActionState } from "@/lib/action-state"
+import { buildCategoryTree } from "@/lib/categories"
 
-type Category = { id: string; name: string }
+type Category = { id: string; name: string; parentId: string | null }
 type Spec = { label: string; value: string }
 type SpecRow = Spec & { id: string }
 
@@ -51,6 +54,7 @@ export function ProductForm({
 }) {
   const router = useRouter()
   const [state, formAction] = useActionState(action, idleState)
+  const categoryTree = useMemo(() => buildCategoryTree(categories), [categories])
 
   // Ids estables (no el índice de la fila) para que borrar una fila intermedia
   // no desplace los valores de las siguientes: ver el bug que esto reemplaza
@@ -157,11 +161,22 @@ export function ProductForm({
               <SelectValue placeholder="Seleccionar..." />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
+              {categoryTree.map((top) =>
+                top.children.length > 0 ? (
+                  <SelectGroup key={top.id}>
+                    <SelectLabel>{top.name}</SelectLabel>
+                    {top.children.map((child) => (
+                      <SelectItem key={child.id} value={child.id} className="pl-6">
+                        {child.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ) : (
+                  <SelectItem key={top.id} value={top.id}>
+                    {top.name}
+                  </SelectItem>
+                )
+              )}
             </SelectContent>
           </Select>
           <FieldError messages={errors?.category_id} />

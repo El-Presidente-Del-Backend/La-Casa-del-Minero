@@ -15,7 +15,7 @@ export function StoreCategories({
   onCategoryChange,
 }: {
   categories: CategoryRecord[]
-  onCategoryChange?: (cat: string) => void
+  onCategoryChange?: (id: string) => void
 }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
@@ -31,7 +31,7 @@ export function StoreCategories({
           {categories.map((cat) => (
             <CarouselItem key={cat.id} className="basis-1/2 pl-4 sm:basis-1/3 md:basis-1/4">
               <button
-                onClick={() => onCategoryChange?.(cat.name)}
+                onClick={() => onCategoryChange?.(cat.id)}
                 className="group relative w-full overflow-hidden rounded-lg border border-border"
               >
                 <div className="relative aspect-[4/3]">

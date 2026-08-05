@@ -23,6 +23,9 @@ export type Product = {
   price: number
   originalPrice?: number
   category: string
+  categoryId: string | null
+  parentCategoryId: string | null
+  parentCategoryName: string
   images: string[]
   badge?: string
   inStock: boolean
@@ -36,4 +39,5 @@ export type CategoryRecord = {
   slug: string
   label: string
   image_url: string | null
+  parentId: string | null
 }

@@ -2,16 +2,18 @@
 
 import { useMemo } from "react"
 import { ProductCard } from "@/components/product-card"
-import type { Product } from "@/lib/products"
+import type { CategoryRecord, Product } from "@/lib/products"
 import { PackageX } from "lucide-react"
 
 export function ProductGrid({
   search,
-  activeCategory,
+  activeCategoryId,
+  categories,
   products,
 }: {
   search: string
-  activeCategory: string
+  activeCategoryId: string
+  categories: CategoryRecord[]
   products: Product[]
 }) {
   const filtered = useMemo(() => {
@@ -20,10 +22,17 @@ export function ProductGrid({
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.description.toLowerCase().includes(search.toLowerCase())
       const matchesCategory =
-        activeCategory === "Todos" || p.category === activeCategory
+        activeCategoryId === "todos" ||
+        p.categoryId === activeCategoryId ||
+        p.parentCategoryId === activeCategoryId
       return matchesSearch && matchesCategory
     })
-  }, [search, activeCategory, products])
+  }, [search, activeCategoryId, products])
+
+  const activeLabel =
+    activeCategoryId === "todos"
+      ? "Todos los Productos"
+      : categories.find((c) => c.id === activeCategoryId)?.label ?? "Productos"
 
   return (
     <div className="flex flex-col gap-6">
@@ -32,7 +41,7 @@ export function ProductGrid({
         <div className="flex items-center gap-3">
           <div className="h-8 w-1.5 rounded-full bg-primary" />
           <h2 className="font-[family-name:var(--font-heading)] text-xl font-bold uppercase tracking-wide text-foreground">
-            {activeCategory === "Todos" ? "Todos los Productos" : activeCategory}
+            {activeLabel}
           </h2>
         </div>
         <p className="text-xs text-muted-foreground">
