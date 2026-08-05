@@ -148,7 +148,7 @@ export function StoreNavbar({
 
       {/* Category navigation - desktop */}
       <nav className="hidden border-t border-border/60 bg-primary md:block">
-        <div className="mx-auto flex max-w-7xl items-center gap-1 px-4">
+        <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-4">
           {allCategories.map((cat) => (
             <button
               key={cat.id}
@@ -156,7 +156,7 @@ export function StoreNavbar({
                 onCategoryChange?.(cat.name)
                 router.push("/tienda")
               }}
-              className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+              className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
                 activeCategory === cat.name
                   ? "bg-primary-foreground/20 text-primary-foreground"
                   : "text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
