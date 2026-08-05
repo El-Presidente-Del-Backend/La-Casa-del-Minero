@@ -9,10 +9,13 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { db, PROJECT_ID } from './_firebase.mjs'
 
 const CATEGORIES = [
-  { name: 'Seguridad', slug: 'seguridad', label: 'Seguridad', imageUrl: '/images/categories/seguridad.jpg' },
-  { name: 'Herramientas', slug: 'herramientas', label: 'Herramientas', imageUrl: '/images/categories/herramientas.jpg' },
-  { name: 'Iluminacion', slug: 'iluminacion', label: 'Iluminación', imageUrl: '/images/categories/iluminacion.jpg' },
-  { name: 'Deteccion', slug: 'deteccion', label: 'Detección', imageUrl: '/images/categories/deteccion.jpg' },
+  { name: 'Seguridad', slug: 'seguridad', label: 'Seguridad', imageUrl: '/images/categories/seguridad.jpg', parent: null },
+  { name: 'Herramientas', slug: 'herramientas', label: 'Herramientas', imageUrl: '/images/categories/herramientas.jpg', parent: null },
+  { name: 'Iluminacion', slug: 'iluminacion', label: 'Iluminación', imageUrl: '/images/categories/iluminacion.jpg', parent: null },
+  { name: 'Deteccion', slug: 'deteccion', label: 'Detección', imageUrl: '/images/categories/deteccion.jpg', parent: null },
+  // Subcategorías de ejemplo, para probar la jerarquía de 2 niveles en local.
+  { name: 'Cascos', slug: 'cascos', label: 'Cascos', imageUrl: null, parent: 'Seguridad' },
+  { name: 'Guantes', slug: 'guantes', label: 'Guantes', imageUrl: null, parent: 'Seguridad' },
 ]
 
 const PRODUCTS = [
@@ -23,7 +26,7 @@ const PRODUCTS = [
       'Casco de seguridad industrial diseñado para las condiciones más exigentes de la minería. Fabricado con polietileno de alta densidad, cuenta con suspensión ajustable de 4 puntos para máxima comodidad durante jornadas largas. Certificado bajo norma ANSI/ISEA Z89.1 Clase E, ofrece protección contra impactos laterales y superiores, así como aislamiento dieléctrico hasta 20,000V. Compatible con accesorios como protectores faciales, orejeras y lámparas frontales.',
     price: 45.0,
     originalPrice: null,
-    category: 'Seguridad',
+    category: 'Cascos',
     imageUrl: '/images/products/casco-seguridad.jpg',
     badge: 'Más vendido',
     inStock: true,
@@ -204,21 +207,40 @@ async function main() {
   }
 
   // Las categorías van primero: sus IDs son necesarios para cada producto.
+  // Dos pasadas porque las subcategorías necesitan el id ya asignado de su
+  // padre (jerarquía de 2 niveles: los padres siempre se crean primero).
   const categoryIds = new Map()
-  for (const category of CATEGORIES) {
+  const topLevel = CATEGORIES.filter((c) => c.parent === null)
+  const subLevel = CATEGORIES.filter((c) => c.parent !== null)
+
+  for (const { parent, ...category } of topLevel) {
     const ref = await db.collection('categories').add({
       ...category,
+      parentId: null,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+    categoryIds.set(category.name, ref.id)
+  }
+  for (const { parent, ...category } of subLevel) {
+    const ref = await db.collection('categories').add({
+      ...category,
+      parentId: categoryIds.get(parent),
       createdAt: FieldValue.serverTimestamp(),
     })
     categoryIds.set(category.name, ref.id)
   }
   console.log(`${CATEGORIES.length} categorías creadas.`)
 
+  const parentNameByCategory = new Map(CATEGORIES.map((c) => [c.name, c.parent]))
+
   for (const { category, ...product } of PRODUCTS) {
+    const parentName = parentNameByCategory.get(category)
     await db.collection('products').add({
       ...product,
       categoryId: categoryIds.get(category),
       categoryName: category,
+      parentCategoryId: parentName ? categoryIds.get(parentName) : null,
+      parentCategoryName: parentName ?? '',
       createdAt: FieldValue.serverTimestamp(),
     })
   }

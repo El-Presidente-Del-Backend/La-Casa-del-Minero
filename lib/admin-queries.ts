@@ -10,13 +10,17 @@ import type { OrderItem, OrderStatus } from '@/lib/orders'
  * el resultado de inmediato, no la versión de hace hasta 60 segundos.
  */
 
-export type CategoryOption = { id: string; name: string }
+export type CategoryOption = { id: string; name: string; parentId: string | null }
 
 export async function getCategoryOptions(): Promise<CategoryOption[]> {
   const snapshot = await adminDb.collection('categories').get()
 
   return snapshot.docs
-    .map((doc) => ({ id: doc.id, name: (doc.data().name as string) ?? '' }))
+    .map((doc) => ({
+      id: doc.id,
+      name: (doc.data().name as string) ?? '',
+      parentId: (doc.data().parentId as string | null) ?? null,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
 }
 
@@ -32,6 +36,7 @@ export async function getAdminCategories(): Promise<CategoryRecord[]> {
         slug: (data.slug as string) ?? '',
         label: (data.label as string) ?? '',
         image_url: (data.imageUrl as string | null) ?? null,
+        parentId: (data.parentId as string | null) ?? null,
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
@@ -52,6 +57,8 @@ export type AdminProduct = {
   originalPrice: number | null
   categoryId: string | null
   categoryName: string
+  parentCategoryId: string | null
+  parentCategoryName: string
   images: string[]
   badge: string | null
   inStock: boolean
@@ -71,6 +78,8 @@ function toAdminProduct(id: string, data: FirebaseFirestore.DocumentData): Admin
     originalPrice: (data.originalPrice as number | null) ?? null,
     categoryId: (data.categoryId as string | null) ?? null,
     categoryName: (data.categoryName as string) || '',
+    parentCategoryId: (data.parentCategoryId as string | null) ?? null,
+    parentCategoryName: (data.parentCategoryName as string) || '',
     images: resolveProductImages(data.images as string[] | undefined, data.imageUrl as string | undefined),
     badge: (data.badge as string | null) ?? null,
     inStock: (data.inStock as boolean) ?? true,

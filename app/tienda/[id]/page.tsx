@@ -44,6 +44,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </Link>
             </li>
             <li>/</li>
+            {product.parentCategoryName && (
+              <>
+                <li>
+                  <Link href="/tienda" className="transition-colors hover:text-primary">
+                    {product.parentCategoryName}
+                  </Link>
+                </li>
+                <li>/</li>
+              </>
+            )}
             <li>
               <Link href="/tienda" className="transition-colors hover:text-primary">
                 {catLabel}

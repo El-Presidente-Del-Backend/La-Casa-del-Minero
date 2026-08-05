@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import Image from "next/image"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import {
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog"
 import { deleteCategory } from "@/app/actions/admin"
 import { CategoryForm } from "./category-form"
+import { buildCategoryTree, hasChildren } from "@/lib/categories"
 import type { CategoryRecord } from "@/lib/products"
 
 export function CategoriesManager({ categories }: { categories: CategoryRecord[] }) {
@@ -27,6 +28,7 @@ export function CategoriesManager({ categories }: { categories: CategoryRecord[]
   }
 
   const editingCategory = categories.find((c) => c.id === editingId)
+  const tree = useMemo(() => buildCategoryTree(categories), [categories])
 
   return (
     <div>
@@ -47,7 +49,12 @@ export function CategoriesManager({ categories }: { categories: CategoryRecord[]
       </div>
 
       {(showForm || editingId) && (
-        <CategoryForm key={editingId ?? "new"} category={editingCategory} onClose={closeForm} />
+        <CategoryForm
+          key={editingId ?? "new"}
+          category={editingCategory}
+          categories={categories}
+          onClose={closeForm}
+        />
       )}
 
       <div className="overflow-hidden rounded-lg border border-border">
@@ -69,48 +76,87 @@ export function CategoriesManager({ categories }: { categories: CategoryRecord[]
                 </TableCell>
               </TableRow>
             ) : (
-              categories.map((cat) => (
-                <TableRow key={cat.id}>
-                  <TableCell>
-                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                      {cat.image_url && (
-                        <Image src={cat.image_url} alt={cat.name} fill className="object-cover" sizes="40px" />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium text-foreground">{cat.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{cat.label}</TableCell>
-                  <TableCell className="text-muted-foreground">{cat.slug}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(cat.id)
-                          setShowForm(false)
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <ConfirmDeleteDialog
-                        trigger={
-                          <Button variant="ghost" size="sm">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        }
-                        title={`¿Eliminar la categoría "${cat.name}"?`}
-                        description="Los productos de esta categoría quedarán sin categoría."
-                        action={deleteCategory.bind(null, cat.id)}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
+              tree.map((top) => (
+                <CategoryRow
+                  key={top.id}
+                  cat={top}
+                  indented={false}
+                  disableDelete={hasChildren(categories, top.id)}
+                  onEdit={() => {
+                    setEditingId(top.id)
+                    setShowForm(false)
+                  }}
+                >
+                  {top.children.map((child) => (
+                    <CategoryRow
+                      key={child.id}
+                      cat={child}
+                      indented
+                      disableDelete={false}
+                      onEdit={() => {
+                        setEditingId(child.id)
+                        setShowForm(false)
+                      }}
+                    />
+                  ))}
+                </CategoryRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
     </div>
+  )
+}
+
+function CategoryRow({
+  cat,
+  indented,
+  disableDelete,
+  onEdit,
+  children,
+}: {
+  cat: CategoryRecord
+  indented: boolean
+  disableDelete: boolean
+  onEdit: () => void
+  children?: ReactNode
+}) {
+  return (
+    <>
+      <TableRow>
+        <TableCell>
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+            {cat.image_url && (
+              <Image src={cat.image_url} alt={cat.name} fill className="object-cover" sizes="40px" />
+            )}
+          </div>
+        </TableCell>
+        <TableCell className={`font-medium text-foreground ${indented ? "pl-8 text-muted-foreground" : ""}`}>
+          {indented ? "└ " : ""}
+          {cat.name}
+        </TableCell>
+        <TableCell className="text-muted-foreground">{cat.label}</TableCell>
+        <TableCell className="text-muted-foreground">{cat.slug}</TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onEdit}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <ConfirmDeleteDialog
+              trigger={
+                <Button variant="ghost" size="sm" disabled={disableDelete} title={disableDelete ? "Elimina primero sus subcategorías" : undefined}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              }
+              title={`¿Eliminar la categoría "${cat.name}"?`}
+              description="Los productos de esta categoría quedarán sin categoría."
+              action={deleteCategory.bind(null, cat.id)}
+            />
+          </div>
+        </TableCell>
+      </TableRow>
+      {children}
+    </>
   )
 }

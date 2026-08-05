@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { StoreNavbar } from "@/components/store-navbar"
 import { StoreHero } from "@/components/store-hero"
 import { StoreFeatures } from "@/components/store-features"
@@ -17,14 +17,16 @@ export function TiendaClient({
   categories: CategoryRecord[]
 }) {
   const [search, setSearch] = useState("")
-  const [activeCategory, setActiveCategory] = useState("Todos")
+  const [activeCategoryId, setActiveCategoryId] = useState("todos")
+
+  const topLevelCategories = useMemo(() => categories.filter((c) => c.parentId === null), [categories])
 
   const scrollToProducts = () => {
     document.getElementById("productos")?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const handleCategoryChange = (cat: string) => {
-    setActiveCategory(cat)
+  const handleCategoryChange = (id: string) => {
+    setActiveCategoryId(id)
     scrollToProducts()
   }
 
@@ -32,17 +34,22 @@ export function TiendaClient({
     <div className="min-h-screen bg-background">
       <StoreNavbar
         categories={categories}
-        activeCategory={activeCategory}
+        activeCategoryId={activeCategoryId}
         onCategoryChange={handleCategoryChange}
         onSearch={setSearch}
       />
 
       <StoreHero />
       <StoreFeatures />
-      <StoreCategories categories={categories} onCategoryChange={handleCategoryChange} />
+      <StoreCategories categories={topLevelCategories} onCategoryChange={handleCategoryChange} />
 
       <section id="productos" className="mx-auto max-w-7xl px-4 pb-16">
-        <ProductGrid search={search} activeCategory={activeCategory} products={products} />
+        <ProductGrid
+          search={search}
+          activeCategoryId={activeCategoryId}
+          categories={categories}
+          products={products}
+        />
       </section>
 
       <StoreFooter />

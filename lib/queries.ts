@@ -14,6 +14,8 @@ interface ProductDoc {
   originalPrice?: number | null
   categoryId?: string | null
   categoryName?: string
+  parentCategoryId?: string | null
+  parentCategoryName?: string
   images?: string[]
   /** Legacy: productos creados antes de soportar múltiples imágenes. */
   imageUrl?: string
@@ -29,6 +31,7 @@ interface CategoryDoc {
   slug?: string
   label?: string
   imageUrl?: string | null
+  parentId?: string | null
 }
 
 function toProduct(id: string, doc: ProductDoc): Product {
@@ -40,6 +43,9 @@ function toProduct(id: string, doc: ProductDoc): Product {
     price: doc.price ?? 0,
     ...(doc.originalPrice != null ? { originalPrice: doc.originalPrice } : {}),
     category: doc.categoryName ?? '',
+    categoryId: doc.categoryId ?? null,
+    parentCategoryId: doc.parentCategoryId ?? null,
+    parentCategoryName: doc.parentCategoryName ?? '',
     images: resolveProductImages(doc.images, doc.imageUrl),
     ...(doc.badge ? { badge: doc.badge } : {}),
     inStock: doc.inStock ?? true,
@@ -55,6 +61,7 @@ function toCategory(id: string, doc: CategoryDoc): CategoryRecord {
     slug: doc.slug ?? '',
     label: doc.label ?? doc.name ?? '',
     image_url: doc.imageUrl ?? null,
+    parentId: doc.parentId ?? null,
   }
 }
 
