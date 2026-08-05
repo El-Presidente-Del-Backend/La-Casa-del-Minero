@@ -7,11 +7,24 @@ import { createServerSession, hasServerSession } from '@/lib/firebase/auth-clien
 
 export function useUser() {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(getFirebaseAuth(), async (firebaseUser) => {
       setUser(firebaseUser)
+
+      // El custom claim "admin" viaja en el propio ID token — es el mismo
+      // camino rápido que usa getCurrentUser() en el servidor (lib/firebase/session.ts).
+      // No se consulta el fallback de Firestore aquí: es solo para mostrar un
+      // atajo de conveniencia, no para autorizar nada.
+      if (firebaseUser) {
+        const tokenResult = await firebaseUser.getIdTokenResult().catch(() => null)
+        setIsAdmin(tokenResult?.claims.admin === true)
+      } else {
+        setIsAdmin(false)
+      }
+
       setLoading(false)
 
       // El SDK de cliente mantiene su propia sesión, que puede sobrevivir a la
@@ -25,5 +38,5 @@ export function useUser() {
     return unsubscribe
   }, [])
 
-  return { user, loading }
+  return { user, isAdmin, loading }
 }
